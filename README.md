@@ -72,7 +72,7 @@ Each marker says *"this many people move **from** here **to** there."* The "plac
 
 | Node type | What it is | Example names |
 |---|---|---|
-| **Room** | Where occupants start. Has its own occupant load. | `MOC`, `PANTRY`, `ROOM-001` |
+| **Room** | Where occupants start. Has its own occupant load. | `ROOM`, `PANTRY`, `ROOM-001` |
 | **Pool** | A shared space (usually a corridor) where occupants from several rooms come together before splitting toward exits. | `BRIDGE`, `CORR-WEST`, `POOL-001` |
 | **Exit** | Where occupants leave: a stair door or exterior exit. Has a capacity. | `STAIR 2`, `EXIT-001` |
 
@@ -113,10 +113,10 @@ EgressTools only looks at markers **in the view you have open**. Each plan or sk
 ### A simple example
 
 ![Example flow diagram](images/02_flow_example.png)
-> 📷 **SCREENSHOT 02:** A small plan (or redline) showing one room with three door markers flowing into a corridor, and two markers from the corridor into two stairs. Label: "MOC (116) → 39 / 39 / 38 → BRIDGE (pool, 148 total with Pantry's 32) → 74 to STAIR 1, 74 to STAIR 2."
+> 📷 **SCREENSHOT 02:** A small plan (or redline) showing one room with three door markers flowing into a corridor, and two markers from the corridor into two stairs. Label: "ROOM (116) → 39 / 39 / 38 → BRIDGE (pool, 148 total with Pantry's 32) → 74 to STAIR 1, 74 to STAIR 2."
 
 ```
-MOC (load 116)  ──39──┐
+ROOM (load 116)  ──39──┐
                 ──39──┤
                 ──38──┤
                       ├──►  BRIDGE (pool: 148)  ──74──►  STAIR 1 (cap 220)
@@ -199,7 +199,7 @@ Do this for **each room**.
 
 1. Select the door markers for **one room**. You can select them before clicking the button, or click the button first and pick them (then click **Finish**).
 2. Click **Build > Room Split**.
-3. **Room name:** accept the automatic name (e.g., `ROOM-001`) or type a meaningful one like `MOC`. Meaningful names make the reports much easier to read.
+3. **Room name:** accept the automatic name (e.g., `ROOM-001`) or type a meaningful one like `ROOM`. Meaningful names make the reports much easier to read.
 4. **Room occupant load:** type the room's occupant load, e.g., `116`.
 5. The markers fill in automatically: **39 / 39 / 38**.
 
@@ -263,7 +263,7 @@ Often the even split isn't what you want. For example, one stair should take mor
    - **unticks EG_Balance** on that marker, so your number is kept from now on, and
    - recalculates the **other** markers at the same split to absorb the difference.
 
-**Example:** MOC's three doors were 39 / 39 / 38. You type **45** into the first one. Result: **45** (manual) / **36** / **35**. The total is still 116.
+**Example:** ROOM's three doors were 39 / 39 / 38. You type **45** into the first one. Result: **45** (manual) / **36** / **35**. The total is still 116.
 
 ![Manual override example](images/09_manual_override.png)
 > 📷 **SCREENSHOT 09:** Before (39/39/38) and after (45/36/35), with Properties showing EG_Balance unticked on the edited marker.
@@ -349,7 +349,7 @@ Select a marker and click **Check > Inspector** (or click Inspector and pick a m
 
 - where the marker comes **from** and goes **to**, and whether it's automatic or manual,
 - the totals at both ends,
-- **which rooms its occupants originally came from**, e.g., "74 into STAIR 2 = 58 from MOC + 16 from PANTRY", and
+- **which rooms its occupants originally came from**, e.g., "74 into STAIR 2 = 58 from ROOM + 16 from PANTRY", and
 - for exit markers, everything arriving at that exit, broken down by room.
 
 ![Inspector output](images/13_inspector.png)
