@@ -559,26 +559,3 @@ Everything the Build tools do, you can also do by typing in Properties. This was
 | **pyRevit Reload** | pyRevit tab > Reload. Reloads all pyRevit tools after installing or updating them. |
 
 ---
-
-## Screenshot checklist (for the guide author)
-
-Save screenshots to an `images/` folder next to this README, using these file names:
-
-| # | File | Content |
-|---|---|---|
-| 01 | `01_ribbon.png` | Full EgressTools ribbon tab |
-| 02 | `02_flow_example.png` | Simple plan/redline: room → corridor pool → two stairs, with numbers |
-| 03 | `03_parameters_annotated.png` | **Diagram:** Properties palette with callouts for Occupants, EG_From, EG_To, EG_Load, EG_Capacity, EG_Balance, EG_Status (plus a note that Top/Bottom/Left/Right are arrow direction) |
-| 04 | `04_shared_params.png` | Edit Shared Parameters dialog with a file loaded |
-| 05 | `05_setup_prompt.png` | Setup Parameters "missing parameters" message |
-| 06 | `06_room_split.png` | Room markers before/after Room Split |
-| 07 | `07_create_pool.png` | Picking in/out markers for Create Pool, with status bar visible |
-| 08 | `08_connect_exit.png` | Exit list and capacity prompt |
-| 09 | `09_manual_override.png` | 39/39/38 → 45/36/35 with EG_Balance unticked |
-| 10 | `10_health_check_plan.png` | Plan with colored problem markers |
-| 11 | `11_health_check_report.png` | Health Check output window |
-| 12 | `12_show_relationships.png` | Halftoned plan with the overlay: red arrows to a corridor label, dashed blue arrows to stairs |
-| 13 | `13_overlay_settings.png` | Overlay Settings window |
-| 14 | `14_inspector.png` | Inspector output with by-room table |
-
-*Delete this section before publishing.*
