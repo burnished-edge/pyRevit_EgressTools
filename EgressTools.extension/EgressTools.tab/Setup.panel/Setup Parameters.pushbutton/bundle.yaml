@@ -1,3 +1,0 @@
-tooltip: >-
-  Checks the selected marker family for EgressTools parameters and offers to add any that are missing. Requires a loaded Shared Parameters file.
-author: EgressTools v1.5

@@ -1,3 +1,0 @@
-tooltip: >-
-  Rebalances, colors problem markers and selects them. Red = over capacity, Orange = unbalanced, Yellow = missing data, Purple = broken path.
-author: EgressTools v1.5
