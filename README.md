@@ -9,6 +9,8 @@ EgressTools is a pyRevit add-in for egress and occupancy plans. You place occupa
 - each stair or exit is checked against its capacity, and
 - when you change one number, the others at that split update to keep the totals correct.
 
+It can also draw a color-coded **flow overlay** on the plan, like a hand markup, so you can see where everyone goes.
+
 ![EgressTools ribbon tab](images/01_ribbon.png)
 > 📷 **SCREENSHOT 01:** The full EgressTools ribbon tab showing all five panels.
 
@@ -58,7 +60,7 @@ EgressTools is a pyRevit add-in for egress and occupancy plans. You place occupa
 
 *Installation instructions coming soon.*
 
-**After installing:** if you previously used Version 1 of EgressTools, delete the old `EgressTools.extension` folder first. Otherwise you'll see two sets of buttons, and Auto Rebalance will run twice. Your existing markers and their values carry over to Version 1.5 without any changes.
+**After installing:** if you previously used Version 1 of EgressTools, delete the old `EgressTools.extension` folder first. Otherwise you'll see two sets of buttons, and Auto Rebalance will run twice. Your existing markers and their values carry over without any changes.
 
 ---
 
@@ -72,7 +74,7 @@ Each marker says *"this many people move **from** here **to** there."* The "plac
 
 | Node type | What it is | Example names |
 |---|---|---|
-| **Room** | Where occupants start. Has its own occupant load. | `ROOM`, `PANTRY`, `ROOM-001` |
+| **Room** | Where occupants start. Has its own occupant load. | `MOC`, `PANTRY`, `ROOM-001` |
 | **Pool** | A shared space (usually a corridor) where occupants from several rooms come together before splitting toward exits. | `BRIDGE`, `CORR-WEST`, `POOL-001` |
 | **Exit** | Where occupants leave: a stair door or exterior exit. Has a capacity. | `STAIR 2`, `EXIT-001` |
 
@@ -113,10 +115,10 @@ EgressTools only looks at markers **in the view you have open**. Each plan or sk
 ### A simple example
 
 ![Example flow diagram](images/02_flow_example.png)
-> 📷 **SCREENSHOT 02:** A small plan (or redline) showing one room with three door markers flowing into a corridor, and two markers from the corridor into two stairs. Label: "ROOM (116) → 39 / 39 / 38 → BRIDGE (pool, 148 total with Pantry's 32) → 74 to STAIR 1, 74 to STAIR 2."
+> 📷 **SCREENSHOT 02:** A small plan (or redline) showing one room with three door markers flowing into a corridor, and two markers from the corridor into two stairs. Label: "MOC (116) → 39 / 39 / 38 → BRIDGE (pool, 148 total with Pantry's 32) → 74 to STAIR 1, 74 to STAIR 2."
 
 ```
-ROOM (load 116)  ──39──┐
+MOC (load 116)  ──39──┐
                 ──39──┤
                 ──38──┤
                       ├──►  BRIDGE (pool: 148)  ──74──►  STAIR 1 (cap 220)
@@ -134,18 +136,18 @@ Select any marker and look at the **Properties** palette. EgressTools adds a few
 
 Using a real marker as the example. This marker carries **148 occupants from the BRIDGE corridor into STAIR 2**, which can take **220**:
 
-| Parameter | Example value | In plain language | Who fills it in? |
-|---|---|---|---|
-| **Occupants** | `148` | **The number shown in the bubble.** How many people go through this door. | You (Manual markers) or the tool (Balance markers) |
-| **EG_From** | `BRIDGE` | **Where these people are coming from.** A room or corridor name. | Build tools, or you |
-| **EG_To** | `STAIR 2` | **Where these people are going.** A corridor or exit name. | Build tools, or you |
-| **EG_Load** | `0` | **The room's total occupant load**, from your occupancy calculation. Only needed on markers leaving a *room*. It's `0` here because BRIDGE is a corridor, and corridors get their total from the rooms feeding them. | Room Split, or you |
-| **EG_Capacity** | `220` | **How many people the exit can take.** Only needed on markers going *into* an exit. | Connect To Exit, or you |
-| **EG_Balance** | ☑ / ☐ | **Ticked = the tool calculates the number. Unticked = you set it.** Found in the **Graphics** group. | Build tools, or you |
-| **EG_Status** | `OK` | **The tool's verdict on this marker.** `OK`, or a short description of the problem. **Don't edit; the tool overwrites it.** | The tool |
+| Parameter | Example value | What to enter | When to fill it in | Who fills it in? |
+|---|---|---|---|---|
+| **Occupants** | `148` | A whole number: the number shown in the bubble. | **Automatic marker:** leave it. **Manual marker:** type the number you want. | You (Manual) or the tool (Automatic) |
+| **EG_From** | `BRIDGE` | The name of the room or corridor this door leads **out of**. | Every marker. | Build tools, or you |
+| **EG_To** | `STAIR 2` | The name of the corridor, stair or exit this door leads **into**. | Every marker. | Build tools, or you |
+| **EG_Load** | `0` | A whole number: the **room's total occupant load** from your occupancy calculation. | On markers leaving a **room** (one door is enough). Leave it **0** on markers leaving a **corridor**; a corridor's total is added up from the rooms feeding it. That's why this example is 0. | Room Split, or you |
+| **EG_Capacity** | `220` | A whole number: the **most occupants the exit can take**, from your egress width calculation. | On markers going **into** a stair or exit. Leave it blank (0) otherwise. | Connect To Exit, or you |
+| **EG_Balance** | ☑ / ☐ | **Ticked** = the tool calculates Occupants. **Unticked** = you set it. Found in the **Graphics** group. | The Build tools tick it. Typing into Occupants (with Auto Rebalance on) unticks it. | Build tools, or you |
+| **EG_Status** | `OK` | **Nothing. Don't edit it.** The tool writes `OK` or a short problem description. | Updated every recalculation. | The tool |
 
 **Parameters EgressTools doesn't touch:**
-- **Top / Bottom / Left / Right** control which way the marker's arrow points. Set them as you always have.
+- **Top / Bottom / Left / Right** control which side of the bubble the chevron sits on. Set them as you always have.
 - **Occupants shows decimals** (e.g., `148.000000`) because it's a Number parameter. The tool always writes whole numbers, and the bubble displays them without decimals.
 
 > 💡 **Node names** aren't case-sensitive, and extra spaces are ignored (`stair 2` = `STAIR 2`). Otherwise, they must be spelled **exactly** the same on every marker. `STAIR 2` and `STAIR-2` are two different exits.
@@ -199,7 +201,7 @@ Do this for **each room**.
 
 1. Select the door markers for **one room**. You can select them before clicking the button, or click the button first and pick them (then click **Finish**).
 2. Click **Build > Room Split**.
-3. **Room name:** accept the automatic name (e.g., `ROOM-001`) or type a meaningful one like `ROOM`. Meaningful names make the reports much easier to read.
+3. **Room name:** accept the automatic name (e.g., `ROOM-001`) or type a meaningful one like `MOC`. Meaningful names make the reports and overlay labels much easier to read.
 4. **Room occupant load:** type the room's occupant load, e.g., `116`.
 5. The markers fill in automatically: **39 / 39 / 38**.
 
@@ -245,9 +247,9 @@ Do this for **each stair or exit**.
 
 > 💡 **Changing a capacity later:** run Connect To Exit again on any marker going into that stair, pick the same exit, and type the new capacity. The tool updates all of its markers.
 
-### Step 4: Check it (Health Check)
+### Step 4: Check it (Health Check and Show Relationships)
 
-Click **Check > Health Check**. See [Section 8](#8-checking-your-work).
+Click **Check > Health Check** to find problems, and **Check > Show Relationships** to see the flow on the plan. See [Section 8](#8-checking-your-work).
 
 ---
 
@@ -263,7 +265,7 @@ Often the even split isn't what you want. For example, one stair should take mor
    - **unticks EG_Balance** on that marker, so your number is kept from now on, and
    - recalculates the **other** markers at the same split to absorb the difference.
 
-**Example:** ROOM's three doors were 39 / 39 / 38. You type **45** into the first one. Result: **45** (manual) / **36** / **35**. The total is still 116.
+**Example:** MOC's three doors were 39 / 39 / 38. You type **45** into the first one. Result: **45** (manual) / **36** / **35**. The total is still 116.
 
 ![Manual override example](images/09_manual_override.png)
 > 📷 **SCREENSHOT 09:** Before (39/39/38) and after (45/36/35), with Properties showing EG_Balance unticked on the edited marker.
@@ -323,25 +325,59 @@ Click **Check > Health Check**. In one step it:
 
 Click **Check > Clear Highlights** to remove the Health Check colors. Only EgressTools' colors are removed.
 
-### Show Relationships: see the flow on the plan
+### Show Relationships: the flow overlay
 
-This draws temporary lines connecting markers, so you can see which doors feed which corridors and stairs.
+Show Relationships draws the egress flow on the plan, like a hand markup:
 
-- **Select one or more markers, then click Show Relationships:** shows only that **branch**, meaning everything upstream and downstream of the selection. Best for tracing one path on a busy plan.
-- **Nothing selected:** shows the **whole view**.
-- **Click again with nothing selected:** **hides** the lines.
+- **Thick, curved arrows** run from each door marker to a **boxed corridor label**, then from that label to each stair-door marker.
+- **Each transfer gets its own color**, in order:
 
-![Show Relationships](images/12_show_relationships.png)
-> 📷 **SCREENSHOT 12:** A branch shown on plan: blue lines from three door markers to a corridor label, red line to an over-capacity stair, with the node labels visible.
+  | Transfer | Color | Line |
+  |---|---|---|
+  | 1st: room → corridor | Red | Solid |
+  | 2nd: corridor → next corridor or stair | Blue | **Dashed** |
+  | 3rd: the next split | Green | Solid |
+  | 4th | Magenta | **Dashed** |
+  | 5th / 6th | Orange / Teal | Solid / Dashed |
 
-**What you're seeing:**
-- **Blue lines:** OK paths. **Red lines:** paths with a problem.
-- Lines meet at a **label** for each room, pool or exit, showing its total. For example, `BRIDGE 148 in -> 74 / 74` or `STAIR 2 74 / 220 cap`.
-- The label sits at the average position of that node's markers, not necessarily inside the room or corridor.
+  Every second transfer is dashed, so neighboring steps are easy to tell apart.
+- **Small arrowheads** repeat along each arrow, with a larger one at the end, so you can read the direction anywhere along it.
+- **Arrows curve to avoid each other.** Each one tries about 20 shapes (gentle curves either way, S-curves, wider loops) and keeps the one with the fewest crossings and the least overlap with labels and markers.
+- **Bold, boxed labels** show each corridor's totals (e.g., `CORR  565 in -> 339 / 226`) and each stair's load (e.g., `STAIR 2  240 / 240 cap`). A label with a problem turns dark red and shows the status (e.g., `! OVER CAP 14`).
+- **The plan is halftoned** so the arrows stand out.
 
-> ⚠️ **These lines are real Revit detail lines.** They will print. Always hide them before printing (see [Section 9](#9-before-you-print-or-issue)).
+![Show Relationships overlay](images/12_show_relationships.png)
+> 📷 **SCREENSHOT 12:** A halftoned plan with the overlay showing: red arrows from room doors into a boxed CORR label, dashed blue arrows from the label to two stair markers, and a stair label.
 
-> 💡 The lines don't move as you edit. Click Show Relationships again to refresh them.
+**Using it:**
+
+| You do | What happens |
+|---|---|
+| Click it with **nothing selected** | Draws the overlay for the whole view and halftones the plan. |
+| **Select one or more markers**, then click it | Draws only their **branch**: everything upstream and downstream. Best for busy plans, and faster. |
+| Click it again with **nothing selected** | **Hides** the overlay and puts the view back the way it was (halftone and view template). |
+
+**Moving labels:** drag any label to where you want it, e.g., into the corridor it represents. Its position is **saved with the view** the next time you click Show Relationships, and reused every time after that. New labels are placed automatically so they don't overlap each other or markers.
+
+> 💡 **The overlay doesn't update live.** After changing numbers or connections, click Show Relationships again (nothing selected hides it; click once more to redraw), or select a marker and click it to redraw just that branch.
+
+> ⚠️ **Views with a view template.** If the template controls the view's Display Model, the plan can't be halftoned while the template is applied. EgressTools **turns the template off** while the overlay is showing and **turns it back on** when you hide the overlay. A message tells you when this happens. Don't change view settings while the template is off; they're overwritten when it's reapplied.
+
+### Overlay Settings
+
+Click **Check > Overlay Settings** to change how the overlay looks. Changes apply the next time you click Show Relationships.
+
+| Setting | Default | What it does |
+|---|---|---|
+| Show room labels | Off | Adds a bold, boxed label for each room with its name and load. |
+| Halftone the plan while the overlay is on | On | Halftones the view so the arrows stand out. |
+| Line weight | 8 | Revit pen weight for the arrows (1–16). Arrowheads use 2 less. How thick it looks depends on the view scale. |
+| Arrowhead spacing | 0.75" | Distance between the small arrowheads, measured on paper. |
+
+Settings are saved for you on your computer, not in the project.
+
+![Overlay Settings](images/13_overlay_settings.png)
+> 📷 **SCREENSHOT 13:** The Overlay Settings window with the two switches and the line weight / spacing options.
 
 ### Inspector: explain one marker
 
@@ -349,11 +385,11 @@ Select a marker and click **Check > Inspector** (or click Inspector and pick a m
 
 - where the marker comes **from** and goes **to**, and whether it's automatic or manual,
 - the totals at both ends,
-- **which rooms its occupants originally came from**, e.g., "74 into STAIR 2 = 58 from ROOM + 16 from PANTRY", and
+- **which rooms its occupants originally came from**, e.g., "74 into STAIR 2 = 58 from MOC + 16 from PANTRY", and
 - for exit markers, everything arriving at that exit, broken down by room.
 
-![Inspector output](images/13_inspector.png)
-> 📷 **SCREENSHOT 13:** Inspector output for a stair marker showing the by-room breakdown table.
+![Inspector output](images/14_inspector.png)
+> 📷 **SCREENSHOT 14:** Inspector output for a stair marker showing the by-room breakdown table.
 
 > 💡 Breakdowns by room are proportional and may show decimals (e.g., 57.6). They're for understanding the flow, not for printing on the plan.
 
@@ -363,11 +399,13 @@ Select a marker and click **Check > Inspector** (or click Inspector and pick a m
 
 EgressTools' checking graphics are **real view graphics**. They print and they sync to central. Run through this checklist before printing:
 
+- [ ] **Show Relationships** with **nothing selected** until the arrows and labels disappear. This also removes the halftone and reapplies any view template that was turned off.
 - [ ] **Clear Highlights** (Check panel). Removes the Health Check colors.
-- [ ] **Show Relationships** with **nothing selected** until the lines disappear. Removes the connector lines and labels.
 - [ ] Final **Health Check** with all statuses OK. Then Clear Highlights again.
 
 > 💡 **Tip:** keep a separate working copy of the egress view (Duplicate View > Duplicate) for checking, and only print the clean one. Because the tool works per view, any markers you place in a duplicated view are calculated independently.
+
+> ⚠️ If you sync or close the model with the overlay showing, the view stays halftoned and without its template. Nothing is lost: the next time you hide the overlay in that view, everything is put back.
 
 ---
 
@@ -383,7 +421,8 @@ EgressTools' checking graphics are **real view graphics**. They print and they s
 | **Balance** | Auto Rebalance | Toggles automatic recalculation on every edit. | Keep it on while working. |
 | **Check** | Health Check | Recalculates, colors problems, selects them, shows the report. | Whenever you want to verify the plan. |
 | **Check** | Clear Highlights | Removes Health Check colors. | Before printing. |
-| **Check** | Show Relationships | Shows or hides connector lines (selected branch or whole view). | To understand or trace a path. |
+| **Check** | Show Relationships | Shows or hides the color-coded flow overlay (selected branch or whole view). | To understand or present the flow. |
+| **Check** | Overlay Settings | Room labels, halftone, line weight and arrowhead spacing for the overlay. | When you want to change how the overlay looks. |
 | **Check** | Inspector | Explains one marker in detail. | When a number doesn't make sense. |
 | **Advanced** | Set Path | Types From/To directly for selected markers. | Power users; see [Section 12](#12-advanced-editing-parameters-directly). |
 
@@ -393,7 +432,7 @@ EgressTools' checking graphics are **real view graphics**. They print and they s
 
 ## 11. Status messages and how to fix them
 
-These appear in **EG_Status** on each marker and in the report.
+These appear in **EG_Status** on each marker, in the report, and on overlay labels.
 
 | Status | Color | What it means | How to fix it |
 |---|---|---|---|
@@ -427,6 +466,8 @@ Everything the Build tools do, you can also do by typing in Properties. This was
 
 > 💡 **Mixing workflows is fine.** The Build tools and manual editing write the same parameters.
 
+> 💡 **Renaming a node moves its overlay label back to the automatic spot,** because saved label positions are stored by name. Drag it again after renaming.
+
 ---
 
 ## 13. Troubleshooting and FAQ
@@ -450,28 +491,44 @@ Everything the Build tools do, you can also do by typing in Properties. This was
 **Setup Parameters says no Shared Parameters file is loaded.**
 - See [Section 5, Step 1](#step-1-load-a-shared-parameters-file).
 
-**The Show Relationships label is in a strange place.**
-- Labels sit at the average position of the node's markers. On L-shaped corridors, that point can land outside the corridor. This only affects display, not the math.
+**An overlay label is in an awkward place, or covers something.**
+- Drag it where you want it. Its position is saved the next time you click Show Relationships.
+
+**The overlay arrows still cross in a few places.**
+- When doors sit on opposite sides of a corridor, some crossings can't be avoided. Try dragging the corridor label to a more central spot, then redraw. Selecting a marker to show only its branch also helps on busy plans.
+
+**The arrows look too thin or too heavy.**
+- Change the line weight in **Overlay Settings**. Pen weights look different at different view scales.
+
+**The plan wasn't halftoned.**
+- Check that halftone is on in **Overlay Settings**.
+- If a message says the Display Model can't be changed, the view's setting is locked by something other than a view template. Halftone the view manually, or turn the setting off.
+
+**My view template is missing after using the overlay.**
+- The overlay is probably still showing. Click Show Relationships with nothing selected to hide it; the template is reapplied. If the template was deleted in the meantime, reapply a template in the view's properties.
 
 **Health Check colored my marker's outline but not the number.**
 - Depending on how the family's label is set up, the color may only apply to the linework. The **EG_Status** value and the report are always reliable.
 
 **Workshared model: something didn't update.**
-- Editing markers requires you to be able to edit them (not borrowed by someone else). Auto Rebalance skips quietly if it can't edit a marker. Click **Rebalance** or **Health Check** to see any errors, and sync to get the latest elements.
+- Editing markers and the view requires you to be able to edit them (not borrowed by someone else). Auto Rebalance skips quietly if it can't edit a marker. Click **Rebalance** or **Health Check** to see any errors, and sync to get the latest elements.
 
 **pyRevit shows an error window (IronPython Traceback).**
 - Take a screenshot of the whole error and send it to the tool maintainer, along with what you clicked and what was selected.
 
-**Where's the Auto Rebalance on/off setting stored?**
-- It's per user, on your computer, and persists between Revit sessions.
+**Where are the Auto Rebalance and Overlay Settings stored?**
+- Per user, on your computer. They persist between Revit sessions. Overlay label positions are different: they're saved in the project, with each view.
 
 ---
 
 ## 14. Known limitations
 
-- **Checking graphics print.** Health Check colors and Show Relationships lines are real view graphics. Clear them before printing ([Section 9](#9-before-you-print-or-issue)).
-- **Connector lines are straight**, from each marker to a label at the node's average position. They don't follow the corridor.
-- **Connector lines don't update live.** Click Show Relationships again to refresh.
+- **Checking graphics print.** Health Check colors, the overlay and its halftone are real view changes. Clear them before printing ([Section 9](#9-before-you-print-or-issue)).
+- **Arrows avoid each other, labels and markers, but not walls.** On a dense core, some arrows will cross walls, just like on a hand markup.
+- **Some crossings are unavoidable** when doors face each other across a corridor.
+- **The overlay doesn't update live.** Click Show Relationships again to refresh it.
+- **Large floors take longer.** A whole floor with 70+ doors can take around 10 seconds to draw. Showing one branch at a time is much faster.
+- **Plan and drafting views only** for the overlay. Sections and elevations aren't supported.
 - **Health Check replaces any color override** you had already applied to a problem marker. Clear Highlights then resets that marker to no override.
 - **Deleting markers** doesn't trigger Auto Rebalance.
 - **Active view only.** Markers on other views or sheets aren't checked together. Each view is its own calculation.
@@ -486,9 +543,13 @@ Everything the Build tools do, you can also do by typing in Properties. This was
 | **Node** | A named place occupants move between: a room, a pool or an exit. |
 | **Pool** | A corridor or shared space where occupants from several rooms combine before splitting toward exits. Plan check expects occupants to be pooled and split this way. |
 | **Split** | All the markers leaving the same node. Their numbers must add up to that node's total. |
+| **Transfer** | One step of occupants moving from one space to the next, e.g., room → corridor. Each transfer gets its own color in the overlay. |
 | **Balance / automatic** | A marker whose number the tool calculates (EG_Balance ticked). |
 | **Manual** | A marker whose number you set (EG_Balance unticked). |
 | **Capacity** | The maximum number of occupants an exit can take. |
+| **Overlay** | The color-coded arrows and labels drawn by Show Relationships. |
+| **Halftone** | A view setting that grays out the model so annotations stand out. |
+| **View template** | A saved set of view settings applied to a view. It can lock settings such as Display Model. |
 | **Active view** | The view currently open and in focus in Revit. |
 | **Ribbon / tab / panel** | The toolbar at the top of Revit. EgressTools has its own **tab**, divided into **panels** (Setup, Build, Balance, Check, Advanced). |
 | **Status bar** | The text line at the bottom-left of the Revit window where tools show instructions. |
@@ -496,3 +557,28 @@ Everything the Build tools do, you can also do by typing in Properties. This was
 | **Output window** | The pyRevit pop-up where reports appear. Element IDs in it are clickable. |
 | **Shared Parameters file** | A text file Revit uses to define parameters that can be shared between families and projects. |
 | **pyRevit Reload** | pyRevit tab > Reload. Reloads all pyRevit tools after installing or updating them. |
+
+---
+
+## Screenshot checklist (for the guide author)
+
+Save screenshots to an `images/` folder next to this README, using these file names:
+
+| # | File | Content |
+|---|---|---|
+| 01 | `01_ribbon.png` | Full EgressTools ribbon tab |
+| 02 | `02_flow_example.png` | Simple plan/redline: room → corridor pool → two stairs, with numbers |
+| 03 | `03_parameters_annotated.png` | **Diagram:** Properties palette with callouts for Occupants, EG_From, EG_To, EG_Load, EG_Capacity, EG_Balance, EG_Status (plus a note that Top/Bottom/Left/Right are arrow direction) |
+| 04 | `04_shared_params.png` | Edit Shared Parameters dialog with a file loaded |
+| 05 | `05_setup_prompt.png` | Setup Parameters "missing parameters" message |
+| 06 | `06_room_split.png` | Room markers before/after Room Split |
+| 07 | `07_create_pool.png` | Picking in/out markers for Create Pool, with status bar visible |
+| 08 | `08_connect_exit.png` | Exit list and capacity prompt |
+| 09 | `09_manual_override.png` | 39/39/38 → 45/36/35 with EG_Balance unticked |
+| 10 | `10_health_check_plan.png` | Plan with colored problem markers |
+| 11 | `11_health_check_report.png` | Health Check output window |
+| 12 | `12_show_relationships.png` | Halftoned plan with the overlay: red arrows to a corridor label, dashed blue arrows to stairs |
+| 13 | `13_overlay_settings.png` | Overlay Settings window |
+| 14 | `14_inspector.png` | Inspector output with by-room table |
+
+*Delete this section before publishing.*
