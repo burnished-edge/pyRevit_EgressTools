@@ -1,0 +1,3 @@
+tooltip: >-
+  Toggles the egress flow overlay: thick, curved arrows (one color per transfer, every second one dashed) with bold boxed labels, over a halftoned plan. Selected markers show only their branch. Drag labels anywhere; positions are saved with the view. Click again with nothing selected to hide it and restore the view before printing.
+author: EgressTools v1.7
