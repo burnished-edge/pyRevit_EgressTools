@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EgressTools: How the occupant markers work</title>
+<style>
+:root{--red:#FF1F1F;--ink:#262A34;--muted:#646C78;--line:#D7DBE1;--panel:#F5F6F8;--bg:#E9ECF0;
+  --room:#485466;--pool:#006EDC;--exit:#188C5A;--auto:#006EDC;--sR:#DC0000;--sO:#F08000;--sY:#C9A200;--sP:#9600C8}
+*{box-sizing:border-box}
+html{scroll-snap-type:y mandatory}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Segoe UI',Arial,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+#track .snap{height:100vh;scroll-snap-align:start}
+#stage{position:fixed;inset:0;display:flex;flex-direction:column}
+#topbar{height:56px;flex:none;display:flex;align-items:center;gap:14px;padding:0 28px;background:#fff;border-bottom:1px solid var(--line);position:relative}
+#topbar::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:var(--red)}
+#topbar img{width:30px;height:30px}
+.brand{font-weight:800;letter-spacing:2.5px;font-size:15px}
+.brand small{display:block;font-weight:600;letter-spacing:1.5px;font-size:10px;color:var(--muted)}
+#cardTitle{margin-left:auto;font-size:13px;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:45vw}
+#progress{position:absolute;left:0;bottom:-1px;height:3px;background:var(--red);transition:width .45s ease}
+#viewport{flex:1;position:relative;perspective:1800px;overflow:hidden}
+.card{position:absolute;left:50%;top:50%;width:1280px;height:760px;background:#fff;border-radius:18px;
+  box-shadow:0 18px 50px rgba(20,30,50,.18);overflow:hidden;
+  transition:transform .7s cubic-bezier(.2,.75,.25,1),opacity .55s ease;transform-origin:50% 50%;will-change:transform,opacity}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;background:var(--red)}
+.card.past,.card.next{opacity:0;pointer-events:none}
+.card.cur{opacity:1}
+#navbar{height:64px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 28px;background:#fff;border-top:1px solid var(--line)}
+.dots{display:flex;gap:9px;flex-wrap:wrap}
+.dot{width:10px;height:10px;border-radius:5px;border:none;padding:0;background:#C3C8CF;cursor:pointer;transition:.25s}
+.dot.on{background:var(--red);width:28px}
+.dot:focus-visible,.btn:focus-visible,.jump:focus-visible{outline:3px solid #0B5FFF;outline-offset:2px}
+.hint{font-size:13px;color:var(--muted);font-weight:600}
+.navbtns{display:flex;gap:10px}
+.btn{border-radius:10px;padding:10px 20px;font-size:15px;font-weight:700;cursor:pointer;transition:.15s}
+.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--ink)}
+.btn.pri{background:var(--red);color:#fff;border:1px solid var(--red)}
+.btn.pri:hover{background:#d90f0f}
+.btn:disabled{opacity:.35;cursor:default}
+.ci{position:absolute;inset:0;padding:34px 46px 30px 56px;display:flex;flex-direction:column}
+.eye{font-size:13px;font-weight:800;letter-spacing:2px;color:var(--red)}
+.ci h2{font-size:38px;line-height:1.1;margin:6px 0 6px;font-weight:800}
+.sub{font-size:17px;color:var(--muted);margin:0 0 18px;line-height:1.4;max-width:1120px}
+.rule{height:1px;background:var(--line);margin:0 0 20px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;flex:1;min-height:0}
+.panel{background:var(--panel);border-radius:16px;padding:20px 22px;position:relative}
+.panel h3{font-size:21px;margin:0 0 10px;font-weight:800;display:flex;align-items:center;gap:10px}
+.num{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--red);color:#fff;font-size:16px;font-weight:800;align-items:center;justify-content:center;flex:none}
+p.t{font-size:15.5px;line-height:1.45;margin:0 0 10px}
+p.m{font-size:14.5px;line-height:1.42;margin:0;color:var(--muted)}
+.tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:800;letter-spacing:.6px;color:#fff;white-space:nowrap}
+.node{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 14px 11px 18px;position:relative;margin-bottom:10px}
+.node::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:6px;border-radius:3px}
+.node.r::before{background:var(--room)}.node.p::before{background:var(--pool)}.node.e::before{background:var(--exit)}
+.node b{display:block;font-size:15.5px;margin:6px 0 2px}
+.node span{font-size:13.5px;color:var(--ink);line-height:1.35;display:block}
+.node .tag{display:inline-block}
+.node i{font-style:normal;font-size:12.5px;color:var(--muted);display:block;margin-top:4px}
+svg text{font-family:'Segoe UI',Arial,sans-serif}
+.cover h1{font-size:64px;line-height:1.02;margin:16px 0 14px;font-weight:800}
+.cover .lead{font-size:22px;line-height:1.45;color:var(--ink);max-width:640px;margin:0 0 22px}
+.toc{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;max-width:640px}
+.jump{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid transparent;border-radius:10px;padding:10px 12px;font-size:15px;font-weight:700;color:var(--ink);cursor:pointer;text-align:left}
+.jump:hover{border-color:var(--red)}
+.jump span{color:var(--red);font-weight:800;min-width:18px}
+.scrollcue{display:flex;align-items:center;gap:10px;margin-top:22px;color:var(--muted);font-weight:700;font-size:14px}
+.scrollcue .mouse{width:22px;height:34px;border:2px solid var(--muted);border-radius:12px;position:relative}
+.scrollcue .mouse::after{content:"";position:absolute;left:50%;top:6px;width:4px;height:8px;margin-left:-2px;border-radius:2px;background:var(--red);animation:wheel 1.6s infinite}
+@keyframes wheel{0%{opacity:0;transform:translateY(-3px)}40%{opacity:1}100%{opacity:0;transform:translateY(9px)}}
+/* anatomy */
+.anat{display:grid;grid-template-columns:400px 1fr;gap:28px;flex:1;min-height:0}
+.pal{border:1px solid #AAB0B8;border-radius:6px;overflow:hidden;font-size:14px;align-self:start}
+.pal .ph{background:#E8EAED;padding:5px 12px;font-weight:700}
+.pal .pt{padding:5px 12px 6px;border-bottom:1px solid #E1E4E8}
+.pal .pt div:last-child{color:var(--muted)}
+.pal .grp{background:#E8EAED;padding:4px 12px;font-weight:700;font-size:13.5px}
+.pal .row{display:grid;grid-template-columns:52% 48%;border-bottom:1px solid #E7E9EC;transition:background .2s,box-shadow .2s;cursor:pointer;outline:none}
+.pal .row div{padding:4px 12px}
+.pal .row div+div{border-left:1px solid #E7E9EC}
+.pal .row:hover{background:#FFF5F5}
+.pal .row.hl{background:#FFECEC;box-shadow:inset 4px 0 0 var(--red)}
+.pal .row .hov{float:right;color:var(--red);font-weight:800;opacity:0}
+.pal .row.hl .hov{opacity:1}
+.pal .row:focus-visible{box-shadow:inset 0 0 0 2px #0B5FFF}
+.cb{display:inline-block;width:15px;height:15px;border:1.5px solid var(--ink);vertical-align:-3px;position:relative}
+.cb.on::after{content:"";position:absolute;left:4px;top:0;width:4px;height:9px;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.pd{background:var(--panel);border-radius:16px;padding:20px 26px;border-left:6px solid var(--red);align-self:stretch;display:flex;flex-direction:column;gap:12px}
+.pd.in{animation:pdin .25s ease}
+@keyframes pdin{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+.pdh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.pdn{font-size:26px;font-weight:800;color:var(--red)}
+.pdq{font-size:18px;font-weight:700;margin-top:2px}
+.pds{background:#fff;border-radius:10px;padding:10px 14px;font-size:15.5px;line-height:1.42}
+.pdl{font-size:11.5px;font-weight:800;letter-spacing:1.2px;color:var(--muted);margin-bottom:3px}
+.pdnote{font-size:14px;color:var(--muted);line-height:1.4;margin-top:auto}
+/* auto/manual */
+.legend{display:flex;gap:28px;align-items:center;margin-bottom:6px;font-size:15px;font-weight:700}
+.legend div{display:flex;align-items:center;gap:6px}
+.try{display:grid;grid-template-columns:230px 1fr 340px;gap:20px;align-items:center}
+.try label{font-weight:800;font-size:15px;display:block;margin-bottom:6px}
+.try input{width:120px;font-size:22px;font-weight:800;padding:6px 10px;border:2px solid var(--red);border-radius:8px;color:var(--ink)}
+.try input:focus-visible{outline:3px solid #0B5FFF;outline-offset:2px}
+.try .msg{font-size:13px;color:var(--sO);font-weight:700;min-height:18px;margin-top:6px}
+.steps{list-style:none;margin:0;padding:0;counter-reset:s}
+.steps li{counter-increment:s;display:flex;gap:10px;font-size:14.5px;line-height:1.35;margin-bottom:7px}
+.steps li::before{content:counter(s);display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--red);color:#fff;font-weight:800;font-size:13px;flex:none}
+.tips div{background:var(--panel);border-radius:10px;padding:6px 12px;margin-bottom:6px;font-size:13px;line-height:1.3}
+.tips b{display:block;font-size:14px}
+/* workflow */
+.band{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:12px}
+.band .panel{display:flex;gap:16px;align-items:center;padding:10px 18px}
+.band img{width:56px;height:56px;flex:none}
+.band b{font-size:17px;display:block;margin-bottom:3px}
+.band span{font-size:14px;line-height:1.38;display:block}
+.wf{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;flex:1;min-height:0}
+.step{border:1.5px solid var(--line);border-radius:16px;padding:12px 16px;display:flex;flex-direction:column;position:relative}
+.step .top{display:flex;justify-content:space-between;align-items:flex-start}
+.step img{width:52px;height:52px}
+.step h4{font-size:20px;margin:2px 0 5px}
+.step ul{margin:6px 0 0;padding:0 0 0 18px;font-size:14px;line-height:1.32}
+.step li{margin-bottom:2px}
+.step li::marker{color:var(--red)}
+.step .res{margin-top:auto;border-top:1px solid var(--line);padding-top:6px}
+.step .res .lb{font-size:11px;font-weight:800;letter-spacing:1px;color:var(--auto)}
+.tipsrow{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:12px}
+.tipsrow div{font-size:13.5px;line-height:1.35}
+.tipsrow b{color:var(--red);display:block;font-size:14.5px}
+/* checking */
+.chk{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:16px;flex:1;min-height:0}
+.chk .panel{padding:14px 20px}
+.ph2{display:flex;gap:14px;align-items:flex-start;margin-bottom:8px}
+.ph2 img{width:52px;height:52px;flex:none}
+.ph2 b{font-size:21px;display:block}
+.ph2 span{font-size:14px;color:var(--muted);line-height:1.35;display:block}
+.sev{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:2px 8px;margin-bottom:2px}
+.sev b{font-size:15px}
+.sev span{font-size:13.5px;line-height:1.3}
+.print{background:#FFF0F0;border:2px solid var(--red)}
+.print label{display:flex;align-items:center;gap:12px;font-size:14.5px;margin:8px 0;cursor:pointer;line-height:1.3}
+.print input{width:20px;height:20px;accent-color:var(--red);flex:none}
+.print img{width:30px;height:30px;flex:none}
+.insp{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:14px}
+.bar{display:grid;grid-template-columns:76px 1fr;align-items:center;gap:8px;margin:7px 0}
+.bar i{display:block;height:20px;background:var(--room);border-radius:3px;position:relative}
+.bar i::after{content:attr(data-v);position:absolute;left:calc(100% + 8px);top:0;font-style:normal;font-weight:800;font-size:14px}
+.rel{display:grid;grid-template-columns:1fr 250px;gap:10px;align-items:start}
+.rel ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.38}
+.rel li{margin-bottom:3px}
+.tiers{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700}
+.tiers div{display:flex;align-items:center;gap:8px}
+/* reference */
+.ref{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;flex:1;min-height:0;align-items:start}
+.grp2{background:var(--panel);border-radius:16px;padding:10px 12px 2px}
+.grp2 .gh{display:flex;gap:10px;align-items:center;margin:2px 4px 8px}
+.btnc{display:grid;grid-template-columns:48px 1fr;gap:2px 12px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:7px;align-items:center}
+.btnc img{width:44px;height:44px;grid-row:span 3}
+.btnc b{font-size:15.5px}
+.btnc span{font-size:13px;line-height:1.3}
+.btnc .tag{grid-column:2;justify-self:start;background:#7A828E;font-size:10px;margin-top:2px}
+@media (prefers-reduced-motion:reduce){.card{transition:opacity .2s linear}.scrollcue .mouse::after{animation:none}.pd.in{animation:none}}
+@media (max-width:640px){#topbar{padding:0 14px 0 20px}#cardTitle{display:none}#navbar{padding:0 12px}.hint{display:none}.btn{padding:9px 14px;font-size:14px}.dots{gap:6px}.dot.on{width:20px}}
+</style>
+</head>
+<body>
+<div id="track"></div>
+
+<div id="stage">
+  <div id="topbar">
+    <img alt="" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFnElEQVR4nO2aT2gUVxzHPz/dgGUtRPCwJeu8DVgJtAUPQnsQNkcFoQo5VPCg0GKkChFbNGDR0pbGgxjRQqUWPSgp1KNFS4VW8BCwUA9CBQPZWSN6KGhhgwlZ8uth3sbNZmd3dmdmV+l8YWFnfm/e78+8+f17DxIkSJAgQYL/LaTZADVmG3AE1a2IpIBJVC9IsXglfvHiR0MDqDEngRP1iXpZisV9McjUUazyI9g3fwIoo/o5sI50+k1gH1BCZK8aM9whOTsPNeY3NUbVcT5bQXOcITVG1ZiH3ZAtSvh+Auo4LxBZA6wT131eh/4MkV7gLXHdp/GJGC98PwHr8CCdLvvQvfs9Panoxeoc/A0AkwDMzg7VEtSYQWA9MCNTUzOxSNYh+BtA9YL9d04dZ8kIaswgqhP28mqMsnUEjcOg41xCZK93oc/tsl9fNeQfFhd3yaNHd+ITMRjazVeCJELDwBFgo701g+oFRN4HdgAlFhe3d9MIYfKVpgaoYpKhXE7J48czAJrPpygUJoAhoITqLikWb7UkeQSwb/4GXr4yishF0umy9V3ngLXAAXHd76Nnns+n1JifbU6wUO0rOoVXIl9RY8a7ZQR1nBeWd68P/ZmlZ+rRG4XBwBDXHQHOAilEJtRxDkYxbzDm4fKVSAwAS0b4Es8I59SYkajm9oPm8ylUp4C285XIDAAgrnsSOGwvz6gxx6KcvxpqzCDT03cRGbC3/POVlznNCgSOAi0KNwKcsZdn7eqIZu5sdiOrV3+LF31AdRJ4ishOe12br9wil9sut2/X/0TigvXAC9YBjYeez5heNWasyuk9UsfZU0UfVmMeWlqFflzz+Ya1SiwrYEkoxxlCZAJIAVfI5fbx5Ekv8/MHUf0QkXct7T6qvyJyXly3sGyOfD7F9PRe4CtEMqjOIXIKGBPXnVvBsyZfaYZYDQCgjrPDGmEtcAvVLbaMrjNY54BDUixehKXv+Awim+2IK/T0jEZZgHWkJ6gbNmxl1aobeEYAuA6cBibJ5coUCltQ3b9Ud3jR5B2qv3ORw+K6k4E1C4iO9AR106b1zM09tG9+VFx3zIffR8BE1a0ZVEfjbMB2pic4P3/QKn/dT3kAcd2fgO/s5Z/A213rPkeZY6vj/GXHDwbgm7N8n7UhdssI3xNULTTnIlk8b/9GPc9dZ+4niGTo6dkQd8fJP0YGzbFFcoG55XJlXLf5uMrcCwux9xtD9wSB/qY/1QcAFApbmglkq7YsUKrNCeKAv4W9rs9WvBy7JMXiNSugl2OLYMNhUyHVcX4BBlDdT8Ww/qg41ntBFAiLMD3BwDm2GpND9W/rU3Zbb79ynJcv/E7lxaj+YeP/vaAKtYqG1aCN8weAKRvGvGWv+kWLBcYaREr2/4Qac16NyVWIakxGjTlZpfxVVB8gMgjcVWN+8GtohEXbPcEWntuM6g1EMsB9YICXb/ipXVXZlw/oN1IsHrc1wDBeDdBrV+ApYDxIJAmKeIuh5SnwHdLp7czOZlE9CuysqglKwE3gdG26a1tdXwP78Qw3ZbPDa1HIGJsBapS/Ri63u/aT0b6+LKlUKoi3V2MGbGG0zbux3D/Eti/QDmwZfIkGyrc9tzHbrCEGgDJwGdV/ETlS/4HGNUukLTFY1gNYC/wYpfIA4ro36e9/D9VDqJaAj63y3T/HoI6zJ8ouUFN+xvSq40x3fV/ACjNS1Y4aj51hhe+rsC9Q0wQ9HGUTtCm6vS+gxoyxXPnxsHO2iFDnGEIZwC71o3gO6JMuKB/sHEOYfQG/+IrIB8CneMrvjioxaQdhapb2e4Ieuq58Bb7nGPr7xxqFYf+OUJB9d5u3R6hHaLRbs9SbqPv77h1Ack7Ql5KcE0zOCYaKr68LOtITfJXRqZ7g6w81JqN9fdnmIxMkSJAgQYLXBf8BnPlkGuvLehoAAAAASUVORK5CYII=">
+    <div class="brand">EGRESSTOOLS<small>OCCUPANT MARKERS, EXPLAINED</small></div>
+    <div id="cardTitle" aria-live="polite"></div>
+    <div id="progress"></div>
+  </div>
+  <div id="viewport"></div>
+  <div id="navbar">
+    <div class="dots" id="dots" role="tablist" aria-label="Cards"></div>
+    <span class="hint">Scroll, use the arrow keys, or the buttons</span>
+    <div class="navbtns">
+      <button class="btn ghost" id="backBtn" type="button">&lsaquo; Back</button>
+      <button class="btn pri" id="nextBtn" type="button">Next &rsaquo;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ICONS = {"setup": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABSklEQVR4nO2Y0W3DMAxEj0bHECJlkG6Qj2a2TBR0AW/QSvAAHaAI85EgQArEVg0JtK17vxYOBEXwdAYIIYQQQkibyNhH9V6zRGIc1VkynXUB1rzlHHp1w7kTsmQ4ATVE1fsTVA8VpHtJ6VhSsEoDoOogEiro/pSWrNIASemo3ofiwvv9gJSKStaZAAAS43dx0RiLS2Y1YAvb/hXNuwAhjcMwZF2ANQxD1gVYwzBUUuwBwxDDEMPQWmjeBQhpnE2EofvDy815JG1jCaoeIPIx5+3BMGRdgDUMQyXFHjAMMQwxDK2F5l1g0b+zs91ExOE2zQNUfydOPzlJtR1QhP+7iYNM3OkfJ1n0BABAppt8AnC4XN7RdcPoyRAGOZ+npmRd6G73pd7rHOttfgmyAdYFWMMGWBdgDRtgXYA1W2lAD9UeIYw/ggghhJAnrhTWkaLsT10UAAAAAElFTkSuQmCC", "roomsplit": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACW0lEQVR4nO2ZsW4TQRCG/4kuEqWLFBSnnbPkh6BAuhcIEkg8QB4gXYJokaAABSQiNxSU9DQpaSK/gLsUFPaeUlCmjGQrfwonYMzZBnvOS5T5Kvs0mv3v93p3ZxZwHMdxHMdxHOc+IlaJqNoFuWuVbwl9qapnFoksDaBVrr+kLTEO102SGQiZpd1Azml6AHKrZOYGWPwqi2AIY4jZxMWWWaY7ihuQWkBq3IDUAlKT1ACqdhnC15Qa0s4AchciT6lapJLgf4HUAlJjacAJyL5hvnn0QfZRFOcbGKtZGMKAqvQ1ICFLDaBqi6pv2emYVWBNw04nZwjvqdpaFjvXAJZlxhD2AXwH8BKjUROlczOMRhlEDkAOGMIhVR/MC601gCE8x3B4BpEugJ3GhDaNSAsiRyDPqLpXGzL9haqPABwBeGws5URifDL7kCEMIFKgpruzVotNJENd02SyS72Qqvp2+yibCcgh8nClQRdB/vv6MdFSmOoQ2QGQsywzOT0dAzU9QZZlhsFgD8DrGTNMenC/jbVgBgDAytvj1VWOra3er0T8AZF3AD5JjJfToX8sbDfOfKbqF5CHAA4g0lpJyJqsajhVbz7wAiLHEPkoMV7Uxc7dBSTGS6mqNxBpg/yA7e3xKmKSMNF6DJG2xPhq3ssnx0+C/wFmBmyquWE9jt3pbtLcKKhaNHw3sO/3Aoa4AYnHT97cSFrh/bzirqpkGlLPgOS4AakFpMYNSC0gNffegCa2wR5DuDOls6UBfQAFgNzyrF6L4Q2UqdKN1fVFcX7b03Mcx3Ecx3EcZyWuAXJryZD2Lk1uAAAAAElFTkSuQmCC", "pool": "data:image/png;base64,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", "exit": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAB8ElEQVR4nO3aPU7DQBAF4DeQgpKCgsLyOhLiGrkABdyAHi6AREcDFSA4AkegoEVcIB0FSGGjFJSUKUCPIpjfsDF417tW5qucv53Vkz0TJQaUUkoppZRSSimllKqNeX7MLFuLvY8qFgKtu4nFxVsac8719ZVANbwIFQAAdADsYDy+Y57v05ilgLX+LWQAEyLLEDkAOaAx2+z1OsFr/oGUBzTmDOSGn1Ulw+QM+InsQ2RPrL3yUqumj02SGUSKBmqugszY63Xk+vq5gXpO8vkBjSk8rXsDIPvyDPkEkSMAJ2Lt2FOd2mT2W/6OeT54P5vIMUROARyKtU8h6tURsiE9g7x4u94fA9b5oUI/68twuAWECkDkEi8vpzIa3QdZf7ZdiPPkLsqDIJdAbDSGb4fdKS8PAECsFSDsJRCdWPvw/Tka8+Vx+C9CidMAYm8gttb2AF9f3VsbAGaNOrJfZZE2B1CaNuqAbneE4XDmh1sfwLRRBwCwttLn574JagCxNxBb0j3A669Uv0g6AHgadS6pB1CqNepcWhFA3VHnMvdNUAOIvYHYoveAJkadS/QA0MCoc0khgFKwUeeSTAAhR53L3DdBDSD2BmJLpgcwzwcx6qYQwCWAjYbuTZj4NFqT+G/Q430J1RTFKIWbM5RSSqnIXgGAX42YxD6fXQAAAABJRU5ErkJggg==", "rebalance": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAEB0lEQVR4nO2av2scRxTHP+/ujAVSoSIBFcfO2agQIoWKFFckWOkEceF0AidExoUd8gckhYsUgVSBgJsYJIjAhYMNcRPiwsYWVukihTDGyGftcRAVLgSJwNh3eil2dJaSu9vZze6NIfNptD9m5vv07s3OrweBQCAQCAQCgcDYUWOuahT94tsOb2gUPVdjVI1p+LKh4kv4bSE4wLcBvvnfO0BcCqkxV1E9W7y61IEa0EG1W3Drv0u7/UlaoZpTU6p1RBr/1aIR1BGn38Id1T2XYs6q/xqqVL9DZNnebQKfubZ1hIdAnYODD6lUOplqpuk3Gh3Z2EiNqlxuV2MmUP0DkWkgETlx4pRsb2f6JzSKntvIOiVxvDNufcj/ETxnxR8Bt4Ear19/mrMtr/r5HKB6yf5dp1JZP/ZsHBSon9kBakwDkUVUXyJynSi6A3QQaagxi3mM8KmfJwIuAyByS+J4TzY2uqiOMwoK1c/kAD1zpgact7dr/Rciq/bqnBozndUIn/rZIqDdXgLqwLbE8YO+fvIFv4vIBKrlfQxL0M/mgF7vor1aG/D28NnFAe+KoQR9ZweoMTOInCUZd38aUOQ28AKRBT19+v0sRvjUzxIBKyRT5zsSx7v/fClx/BL4GYBut4woKEXf3QGqnyc1KteGlqlWf7RXy2rMhHPbHvWdHKDGLCIyh+quHXcHIq3WFvDIztKWh5XLSpn6bhFw6H2RdYcFxtqxOkVQon6qA+y4mnizVlsdWRhgcvK6naUtqjFzLkb41HeJgGU7vj6QZ8+20wrL48d/ATfs7YpD+1710x1wGErV6qCxdzC1WnHdoGT9oTtCasw39nIWgIOD9448G02vhw3Dd47U+UHieM+p/hj1h26IqDF/AlOuBqdy8uS78vTpi2MaIzZExqEPo/YEVbcQaQKbqKb2vSHMILKE6u4g8ZGMSX/Upug9oAnsSLt9IY+6RtG3wBIid3NUH4v+8I9gssTsksyqFjKLz87WgS8BqFaHz9486w91gO2T35NEyU01ZsZZfH5+ilevbiIyjeoNabU2XeuOW3/0MNhoXCHZcp4FHqoxzVRxY+bY37+PSBPVJ4h84Wq4D/3UbXGdn59if/834AOgi+otYA2RTbsCS3ZqWq0mIueBFTtxeYLIR4NWbv22HbbFy9R3ckBfYGfnCqpfIfJmlaWaGP3miAuSfnuNycmv7axseLuO5wJl6UPGgxHbDy8DHwMLHB9FtoBf6fVWpdNxGrayHowUrQ85T4ag/6vU7e3uYThmaiPnyVBR+t4JKTJvAcEBvg3wTXCAbwN8U2heSuZconw5Qk65P6645Qi5kj+XyD1HyDH3x5WCM5MG5BIVjWPuTyAQCAQCgUAghb8BLKlQDV4g19kAAAAASUVORK5CYII=", "auto": "data:image/png;base64,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", "health": "data:image/png;base64,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", "clear": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACHklEQVR4nO2asU7DMBCG/2MNQ8du6Yi6ITGydGRkZODZGHgEho5V36Bj10QMHTpkSDckM2ALUIPqxHdnS9wnIdSi5Px/os1dHMAwDMMwDMMwDMMwDMP4X1DuBQTccnmN0+kFwAzAMzXNQaNuEQJ8+DWA+6833B5EKw0JV9IFLvErvHMHH/4Gzm1cXc+l62cVcBaeaAWilaaEbAKGwlPT7KlpDpoSsgj4K3z4u6YEdQGXwge0JKgKiA0f0JCgJmBs+IC0BBUBU8MHJCWIC0gNH5CSICqAK3xAQoKYAO7wAW4JIgKkwgc4JbALOBtsgM7/sMIlgVWA9mDDIYFNQK7BJlUCi4Dcg81AnXXssckCihlsqqoH0dG/msUeliSglMFmYB0PscdOFlDKYJN6yZ0koJTBhqPfGC2glMGGq9ka/x/Q96+pRVMlcHaaUz4CM/+7Q0KHN1UCd5s9XgDRE9dneKwEiRljtADuL7LY80kNWJOuAtoSJKfLpK0xV9dzOLfxi07ezho6H6qqFx2tU0+gIOEIofAA0+aoqAQAUuEBpmmQvc39OdgIhgcY7weU1uHFwnpHqKQOLxb2e4KldHixiNwVLqHDi0VsXyB3hxeL6M5Qzg4veo0aRXJ0eLGoPSWm3eHFovqY3FmHBwDOdRDYObrAjtr2EcjwnKD/DngDcKdd+3sRbkdtewtkfFDS1fUiV20sFu+03X5kq28Y5fAJqbZwLq218kQAAAAASUVORK5CYII=", "relationships": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFnElEQVR4nO2aT2gUVxzHPz/dgGUtRPCwJeu8DVgJtAUPQnsQNkcFoQo5VPCg0GKkChFbNGDR0pbGgxjRQqUWPSgp1KNFS4VW8BCwUA9CBQPZWSN6KGhhgwlZ8uth3sbNZmd3dmdmV+l8YWFnfm/e78+8+f17DxIkSJAgQYL/LaTZADVmG3AE1a2IpIBJVC9IsXglfvHiR0MDqDEngRP1iXpZisV9McjUUazyI9g3fwIoo/o5sI50+k1gH1BCZK8aM9whOTsPNeY3NUbVcT5bQXOcITVG1ZiH3ZAtSvh+Auo4LxBZA6wT131eh/4MkV7gLXHdp/GJGC98PwHr8CCdLvvQvfs9Panoxeoc/A0AkwDMzg7VEtSYQWA9MCNTUzOxSNYh+BtA9YL9d04dZ8kIaswgqhP28mqMsnUEjcOg41xCZK93oc/tsl9fNeQfFhd3yaNHd+ITMRjazVeCJELDwBFgo701g+oFRN4HdgAlFhe3d9MIYfKVpgaoYpKhXE7J48czAJrPpygUJoAhoITqLikWb7UkeQSwb/4GXr4yishF0umy9V3ngLXAAXHd76Nnns+n1JifbU6wUO0rOoVXIl9RY8a7ZQR1nBeWd68P/ZmlZ+rRG4XBwBDXHQHOAilEJtRxDkYxbzDm4fKVSAwAS0b4Es8I59SYkajm9oPm8ylUp4C285XIDAAgrnsSOGwvz6gxx6KcvxpqzCDT03cRGbC3/POVlznNCgSOAi0KNwKcsZdn7eqIZu5sdiOrV3+LF31AdRJ4ishOe12br9wil9sut2/X/0TigvXAC9YBjYeez5heNWasyuk9UsfZU0UfVmMeWlqFflzz+Ya1SiwrYEkoxxlCZAJIAVfI5fbx5Ekv8/MHUf0QkXct7T6qvyJyXly3sGyOfD7F9PRe4CtEMqjOIXIKGBPXnVvBsyZfaYZYDQCgjrPDGmEtcAvVLbaMrjNY54BDUixehKXv+Awim+2IK/T0jEZZgHWkJ6gbNmxl1aobeEYAuA6cBibJ5coUCltQ3b9Ud3jR5B2qv3ORw+K6k4E1C4iO9AR106b1zM09tG9+VFx3zIffR8BE1a0ZVEfjbMB2pic4P3/QKn/dT3kAcd2fgO/s5Z/A213rPkeZY6vj/GXHDwbgm7N8n7UhdssI3xNULTTnIlk8b/9GPc9dZ+4niGTo6dkQd8fJP0YGzbFFcoG55XJlXLf5uMrcCwux9xtD9wSB/qY/1QcAFApbmglkq7YsUKrNCeKAv4W9rs9WvBy7JMXiNSugl2OLYMNhUyHVcX4BBlDdT8Ww/qg41ntBFAiLMD3BwDm2GpND9W/rU3Zbb79ynJcv/E7lxaj+YeP/vaAKtYqG1aCN8weAKRvGvGWv+kWLBcYaREr2/4Qac16NyVWIakxGjTlZpfxVVB8gMgjcVWN+8GtohEXbPcEWntuM6g1EMsB9YICXb/ipXVXZlw/oN1IsHrc1wDBeDdBrV+ApYDxIJAmKeIuh5SnwHdLp7czOZlE9CuysqglKwE3gdG26a1tdXwP78Qw3ZbPDa1HIGJsBapS/Ri63u/aT0b6+LKlUKoi3V2MGbGG0zbux3D/Eti/QDmwZfIkGyrc9tzHbrCEGgDJwGdV/ETlS/4HGNUukLTFY1gNYC/wYpfIA4ro36e9/D9VDqJaAj63y3T/HoI6zJ8ouUFN+xvSq40x3fV/ACjNS1Y4aj51hhe+rsC9Q0wQ9HGUTtCm6vS+gxoyxXPnxsHO2iFDnGEIZwC71o3gO6JMuKB/sHEOYfQG/+IrIB8CneMrvjioxaQdhapb2e4Ieuq58Bb7nGPr7xxqFYf+OUJB9d5u3R6hHaLRbs9SbqPv77h1Ack7Ql5KcE0zOCYaKr68LOtITfJXRqZ7g6w81JqN9fdnmIxMkSJAgQYLXBf8BnPlkGuvLehoAAAAASUVORK5CYII=", "inspector": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAFX0lEQVR4nO2az2uTSRjHP09Na6E55JBDwfpOIqVI8dCDB0ElEbwsFLaCgsceFLx5Waj7ByyLoFhYPHiy4B4KKnvYgt5ssbIeCnrqFjfVvKFgYQV7SPFHWp89vJNuTNombzNvJDXfS2Bm3vl+32/emWfmmYEOOuiggw466OB7hbjuUA8dGiAWGwVOonoMkQEgGVTqGiIrwBLwjM3NGVlZybnWEAbODFBjxlC9ikg25KMLwG1Sqd9lbm7DlZ5G0bQBakwW1VuIjNiiIqoziMzx5csCGxt5efv2nW2bAFLACKoZREYpfx2QQ/VnKRQeNKspDPZsgGYyMfL5G8BVW5QDbgJT4vsfQ/RxHtWJLQNVp4nHL8viYnGv2iKHDg0l1Zinaoyq531QY65pJhNrqk/Pu6Se9972+bcak3Ikd1eE/gJ0aCjJx49PETlK8K9fEN9/6UKMfen7wHFUV+nuPi3Ly5FOkl1hGmsmE+PTpz8QOYrqEnDa1csDiO/n6es7A8wj0k+p9KedNyJDKAPsmD8F5BA5I76/6lqQLC4W6ev7AdXn1ui7rjn2BDUmWzHmRyLnGxwcUGP+VWNUjRmPmq++IM97YcVcaxmnMRet6W/VmN4oOBoaAmrMmA1TOVKpG1EI2Q7i+9OoziLSD1yJgqOx0BWs8ABuVq/W1JjfUB11pOelFArnvioRuQ5kUb0KTDri2UJdA3RwcIBSKQsUganaBjqASMqJGtW16iLx/cdqTA6RQT1y5JS8fj3vhMui/hdQKo1acTNSKNSs8KRQOOds0ZJOr1AobFfzEJhgc3MUaLEBcBIAkbmdGojv552o8f2damaBiS0tDlF/ElQ9BsCBAwuuyRvGwYMLX2lxiPoGBPt5iMXyrskbhbx69Q4oIpLQ4eG4y74bGQLJChE1iDwKbBHpO0TirK8nCSZkJ2hqBwdEHgWiRn0DgjRWQo1JiO+vVVe3KAoAJOxvjYZmUN+AIIeXIMjkvNy2ScRRwO4IE0Bxuz+hGTSyFF6yvyMuiUOizL20W6O9oBEDngGgmnFNHgJZ+/vMdcf1h0AsNsPGxi1ERjWTiTnaC+w8228H1R8Rga6umZA8dVHXAFlezqkxC8Bx8vnzwHSVuPBRIMRsr8acIMgir+J5s7x5E4qqHhoNg7eBu6hOUGXAnqLA7rP91wgyxiBy51ucGwQaMpmYGvOPTU5cahlvOn3Wcr6POjdYX4znna8Qk4qcz5iEet4by/lTVDwNJ0WlUHiA6jQiCeC+6zV5JewZwz07t8yTTk9GxRUuKxyPX7bp8OOsrz+KwgR7WvQIKEeWBPl8crdnmkH4gxFjUqj+hUg/qs/p6bkgudyKCzF2nN/j/5e3FboUVRo+3BeAXfZ2d5+2ok5QKr1QYy42K0Q97yyqL6h+ecCeDzxRY/qb5anpeq8PqjEJVO8iMhYU6Cwi18X3H4fs54QNdWO2aJ5g3V+b/IjgS3BxPD6O6q82dQ3BeeFDYJbPnxfKR+MV7RMEa/usXeGNBBW6BvxCOj1JPp9E9Yk9f6widGuCkwsS9tDiik2fp6qqi6iWTUjYKFLxsK4icgeYrNzpqTH9rTDB/RWZw4dP0dVVeUUmUdWkSPmKjOoM6fTsTiu8Vpjg3IBq6PBwOY0FsBZ2Px+1CZEb4AJRmhA6DH4LiO+vInLGLsKqKpsLkW1hAERnQtsYANGY0FYGgHsT2s4AcGtCWxoA7kxoWwPAjQltbQA0b0LbGwDNmbAvDIAGTdgmg7VvDIAGTPjwYby6eF8ZAHVMUK25a7jvDIAdTFBdpadnqqZtK4W1Gjo8HKdYHAd66e2d2umWSwcddPD94j9KwMQMP5/W/gAAAABJRU5ErkJggg==", "setpath": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAC7klEQVR4nO2av2sTYRjHP0/pFoUODhmOXIYbShF0KOhQKBmF+if4X7g4CA46uAm6dHIRxMlFqVvp5lChbh0K8mIKBTtkaLCQwOPQa5qQi+a9973ce/a+EMi9l/fH58Obh/DmoE6dOnXq1KlTp06dOnXqXL9I2QuYN7q2doN+/y2wAjwSY058jFsJASn8DrBx0aCHiHR8SFhyHaDoTMCrnqTwq6juahw3XccPWsAUvEgHkY5PCcEKyIIXYw7FmBOfEoIUMAv+8r5PCcEJmCp40EtfE/ElISgBtgXPh4RgBOQteBkSdmzmDUKAc8FrNM4QOU2vVmzmLl2Aa8HL6P/AZv5Sfwn+C37is3HcRHU3lXCISIdG42ze/rNSmgAb+FGfaQmnNv2zUoqAPPCjvuMSABd4KKEGuMADkwXPER4WLMAV3lleRhYmIER4WJCAUOFhAQJChoeCBYQODwUKqAI8FCSgKvBQgIAqwYNnAVWDB48CqggPngRUFR48CKgyPDgKqDo8OAj4H+DBZQf0+++pODzkFKBJEgFb6WWPjHP7mX0Dgoe8O2AwWB+9tziPDw0e8gpQvRTwYd4/JUKEh7wCRO5c9F76NM+5fajwkL8I3gdA5CDHuX0w8JDjVFiTJGIw+AmciTE3R+0FndsXHfsdcFUAD8abs3ZC6PAAy9Y9VNcRAfg20RzHK6jeBj4Dq77O7YuOvYDLAgjL2mo9RuQecBdIUjHjOULk4dx/ekRRIt3ukfWaHGJfA+L4F3Ar49Yp8BXV74jsMxzuy/Fx12rsVus3ItvAMzGmZ7u2PLEX0Gp9RGQDR9jMseNYL95oD5GXwCsx5tx13L8lqOcERwKu0gWe0m6/k729YRFzTgnQOH6N6lbWhwuPSDuzXfUAkSdizBffU04XQdVo5kLKSxNo6ubmsu+dkPkV0Dhu+5zEIj8mrlR7wAtE3hRVC8KsAarnY0WwV+Sc9r8Dis0Q2Ebkua+nwSsVjaKk7DXUuW75A7QKP17Fv/wbAAAAAElFTkSuQmCC", "settings": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAACZElEQVR4nO2av2oUURSHf0cmARkDFikWspmTDRZLsHBh+7EVFFzQyhew8AF8ATutDOgrWKVIETsLBQstLCQEDGR3IiiYIoXpQn4WGaK47uySuffODZ6vW+7dc+5c5v6ZjwMYhmEYhmH8p4irQMzzBHt7DwE8AHADIgnIzxB5hTRdl+3tn65yucTJBFC1BWATQH9Cl10Ad2Q02nGRzyWX6gZgnif4/fC7IO8jTRcAXAZwC8BHANdAblH1at180cEse0RVUvUL19aujLXneULVt1Qls+xpE2P0CrPsPVXJTufexD6rq/1yAr6FHNssVO4BVH0O8nZ1BGkDSJCmC1UbHVV/AFgEOTzPQGvwSYpiMKkxqfwr2YbIykxpjo6Op8Q6hghmjucK8rCquXICpCgGVF2ZkmITwHUANwG8/ucYVLsAWiAPIdKbEs8tnc5XFIW/+FR9XG6CH8oTYbxPlm2Ue8ALfyM5H7WPQaTpOk7P+T6GwzdcXj67C1C1yyzbgMhdAAeYn39SO59jXF2EuiC3/ljfB+Wab539PjkZyP7+Oxf5XFL/DQAgo9EORHogn4H8DmARIqdrnnyJublejA/vDaq2uLTUbnochmEY03AmRHwQQrJEOwGhJIuTe4BrTLKYZAknWeoLER+4lSyBhIgPXEiWAELEB+4ki28h4oOQkiXKYzCkZIn5IhREssT5BsAkyxgmWQzD8EGQYzDm6hHvExB79YjXe4CJDRMb8VeP+BUicVSPRCBEmqweaViINF890qQQuQjVI34/hy9A9UiIi1DU1SPehYiJjb8wsWEYhmEYRiz8AnpCxYsqvMq5AAAAAElFTkSuQmCC"};
+const C = {ink:'#262A34',muted:'#646C78',line:'#C9CED5',room:'#485466',pool:'#006EDC',exit:'#188C5A',auto:'#006EDC',
+  red:'#DC0000',orange:'#F08000',yellow:'#C9A200',purple:'#9600C8',brand:'#FF1F1F'};
+const TIER=['#E61E1E','#005FE6','#00963C','#C800AA','#F08200','#00A0AA'];
+
+/* ---------- SVG helpers ---------- */
+/* Revit-style occupant marker: thin circle, bold number, heavy chevron on the side people travel toward. */
+function mk(x,y,n,o){
+  o=o||{}; const r=o.r||20, col=o.st?C[o.st]:'#111', dir=o.dir||'up';
+  const rot={up:0,right:90,down:180,left:270}[dir];
+  const fs=String(n).length>2?r*0.86:r*1.02;
+  let s=`<g transform="translate(${x},${y})">`;
+  s+=`<polyline points="${-1.08*r},${-1.22*r} 0,${-2.2*r} ${1.08*r},${-1.22*r}" fill="none" stroke="${col}" stroke-width="${0.27*r}" stroke-linejoin="miter" stroke-miterlimit="10" transform="rotate(${rot})"/>`;
+  s+=`<circle r="${r}" fill="${o.fill||'#fff'}" stroke="${col}" stroke-width="${o.st?2.4:1.4}"/>`;
+  s+=`<text y="${fs*0.36}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="${col}" font-family="Arial Narrow,Arial,sans-serif">${n}</text>`;
+  if(o.mode){const bx=r*0.86,by=r*0.86,bg=o.mode==='A'?C.auto:C.ink;
+    s+=`<circle cx="${bx}" cy="${by}" r="${r*0.42}" fill="${bg}" stroke="#fff" stroke-width="1.5"/><text x="${bx}" y="${by+r*0.17}" text-anchor="middle" font-size="${r*0.48}" font-weight="800" fill="#fff">${o.mode}</text>`;}
+  return s+'</g>';
+}
+function chip(x,y,w,h,t,sub,col){
+  let s=`<rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="12" fill="${col}"/>`;
+  if(sub){s+=`<text x="${x}" y="${y-4}" text-anchor="middle" font-size="20" font-weight="800" fill="#fff">${t}</text><text x="${x}" y="${y+20}" text-anchor="middle" font-size="15" fill="#fff">${sub}</text>`;}
+  else s+=`<text x="${x}" y="${y+7}" text-anchor="middle" font-size="20" font-weight="800" fill="#fff">${t}</text>`;
+  return s;
+}
+let AID=0;
+function arr(x1,y1,x2,y2,col,w,dash){
+  col=col||C.muted; w=w||3; const id='a'+(AID++);
+  return `<defs><marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="${w>3?4:5}" markerHeight="${w>3?4:5}" orient="auto"><path d="M0,0 L10,5 L0,10z" fill="${col}"/></marker></defs>`+
+    `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${w}" ${dash?'stroke-dasharray="7 6"':''} marker-end="url(#${id})"/>`;
+}
+/* overlay-style arc: quadratic curve, repeating small chevrons, bigger one at the end */
+function arc(x1,y1,x2,y2,bow,col,dash,w){
+  w=w||4.5; const mx=(x1+x2)/2,my=(y1+y2)/2,dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1;
+  const cx=mx-dy/L*bow, cy=my+dx/L*bow;
+  let s=`<path d="M${x1},${y1} Q${cx},${cy} ${x2},${y2}" fill="none" stroke="${col}" stroke-width="${w}" ${dash?'stroke-dasharray="9 6"':''} stroke-linecap="round"/>`;
+  const at=(t,h)=>{const u=1-t,px=u*u*x1+2*u*t*cx+t*t*x2,py=u*u*y1+2*u*t*cy+t*t*y2,
+      tx=2*u*(cx-x1)+2*t*(x2-cx),ty=2*u*(cy-y1)+2*t*(y2-cy),a=Math.atan2(ty,tx);
+    return `<polyline points="${px+h*Math.cos(a+Math.PI-0.5)},${py+h*Math.sin(a+Math.PI-0.5)} ${px},${py} ${px+h*Math.cos(a+Math.PI+0.5)},${py+h*Math.sin(a+Math.PI+0.5)}" fill="none" stroke="${col}" stroke-width="${w*0.62}" stroke-linecap="round" stroke-linejoin="round"/>`;};
+  s+=at(0.36,7)+at(0.68,7)+at(1,11);
+  return s;
+}
+const ln=(x1,y1,x2,y2,col,w)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col||C.line}" stroke-width="${w||2.5}"/>`;
+const tx=(x,y,s,o)=>{o=o||{};return `<text x="${x}" y="${y}" text-anchor="${o.a||'start'}" font-size="${o.s||15}" font-weight="${o.b?800:400}" fill="${o.c||C.ink}">${s}</text>`;};
+const check=(x,y,col)=>`<polyline points="${x-10},${y} ${x-3},${y+8} ${x+11},${y-9}" fill="none" stroke="${col||C.exit}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+const ic=(k,size,alt)=>`<img src="${ICONS[k]}" width="${size||56}" height="${size||56}" alt="${alt||''}">`;
+const head=(i,title,sub)=>`<div class="eye">EGRESSTOOLS &bull; ${i} OF 7</div><h2>${title}</h2><p class="sub">${sub}</p><div class="rule"></div>`;
+
+/* ---------- cards ---------- */
+const CARDS=[];
+
+/* 0. cover */
+CARDS.push({title:'Welcome',html:`<div class="ci cover" style="flex-direction:row;gap:40px;align-items:center">
+ <div style="flex:1">
+  <div class="eye">EGRESSTOOLS FOR REVIT &bull; pyRevit</div>
+  <h1>Occupant markers<br>that add themselves up.</h1>
+  <p class="lead">Place markers at the doors as usual. EgressTools splits each room across its doors, pools occupants in the corridor, splits them again toward the stairs, and checks every stair against its capacity.</p>
+  <div class="toc" id="toc"></div>
+  <div class="scrollcue"><div class="mouse"></div>Scroll down to flip through the cards</div>
+ </div>
+ <svg width="520" height="560" viewBox="0 0 520 560" aria-label="Three door markers pooling into a corridor and splitting to two stairs">
+  ${chip(90,140,130,70,'MOC','load 116',C.room)}
+  ${[0,1,2].map(j=>ln(155,140,205,70+j*70)).join('')}
+  ${[[39,70],[39,140],[38,210]].map(([n,y])=>mk(232,y,n,{dir:'right',r:22})+arr(290,y,334,250+(y-140)*0.25)).join('')}
+  ${chip(90,330,130,70,'PANTRY','load 32',C.room)}
+  ${ln(155,330,205,330)}${mk(232,330,32,{dir:'right',r:22})}${arr(290,330,336,292)}
+  <circle cx="390" cy="270" r="62" fill="${C.pool}"/>${tx(390,258,'BRIDGE',{a:'middle',s:17,b:1,c:'#fff'})}${tx(390,292,'148',{a:'middle',s:30,b:1,c:'#fff'})}
+  ${arr(368,334,300,404)}${arr(412,334,470,404)}
+  ${mk(290,430,74,{dir:'down',r:22})}${mk(470,430,74,{dir:'down',r:22})}
+  ${tx(290,522,'STAIR 1',{a:'middle',b:1,c:C.exit,s:16})}${tx(470,522,'STAIR 2',{a:'middle',b:1,c:C.exit,s:16})}
+ </svg></div>`});
+
+/* 1. what is a marker */
+CARDS.push({title:'What is an occupant marker?',html:`<div class="ci">${head(1,'What is an occupant marker?','A marker sits at a door and shows how many people leave through it. EgressTools links markers together so the numbers always add up.')}
+<div class="grid3">
+ <div class="panel"><h3><span class="num">1</span>A marker at a door</h3>
+  <svg width="330" height="250" viewBox="0 0 330 250" aria-label="A conference room with two doors and a marker at each">
+   <rect x="232" y="10" width="92" height="230" fill="#E6E9ED"/>${tx(278,30,'CORRIDOR',{a:'middle',s:12,b:1,c:C.muted})}
+   <path d="M232 40 H20 V210 H232 V178 M232 142 V112 M232 76 V40" fill="none" stroke="${C.ink}" stroke-width="6"/>
+   <path d="M232 76 h-36 M232 76 a36 36 0 0 1 -36 36" fill="none" stroke="${C.muted}" stroke-width="2"/>
+   <path d="M232 142 h-36 M232 142 a36 36 0 0 1 -36 36" fill="none" stroke="${C.muted}" stroke-width="2"/>
+   ${tx(110,118,'CONFERENCE',{a:'middle',s:15,b:1,c:C.muted})}${tx(110,140,'load = 40',{a:'middle',s:14,c:C.muted})}
+   ${mk(266,94,20,{dir:'right',r:19})}${mk(266,160,20,{dir:'right',r:19})}
+  </svg>
+  <p class="t">The number is the <b>Occupants</b> value: how many people go through that door. Two doors, two markers: 20 + 20 = 40.</p>
+  <p class="m">The heavy chevron shows which way people travel. It's set with Top / Bottom / Left / Right, and EgressTools never changes it.</p>
+ </div>
+ <div class="panel"><h3><span class="num">2</span>Every marker is an arrow</h3>
+  <p class="t">Each marker says: <b>&ldquo;this many people move FROM here TO there.&rdquo;</b></p>
+  <svg width="330" height="330" viewBox="0 0 330 330" aria-label="MOC to marker 39 to BRIDGE">
+   ${tx(10,52,'EG_From',{b:1,c:C.room,s:15})}${chip(205,46,210,64,'MOC','where they come from',C.room)}
+   ${arr(205,80,205,130,C.ink,3)}
+   ${tx(10,166,'Occupants',{b:1,s:15})}${mk(205,160,39,{dir:'down',r:24})}
+   ${arr(205,222,205,268,C.ink,3)}
+   ${tx(10,306,'EG_To',{b:1,c:C.pool,s:15})}${chip(205,300,210,58,'BRIDGE','where they go',C.pool)}
+  </svg>
+  <p class="m">Rooms, corridors and stairs are called <b>nodes</b>. The Build tools write these names for you, so you rarely type them.</p>
+ </div>
+ <div class="panel"><h3><span class="num">3</span>Three kinds of nodes</h3>
+  <div class="node r"><span class="tag" style="background:var(--room)">ROOM</span><b>Only sends people out.</b><span>Has its own occupant load from your occupancy calc.</span><i>e.g. MOC, PANTRY</i></div>
+  <div class="node p"><span class="tag" style="background:var(--pool)">POOL</span><b>Receives AND sends people.</b><span>Usually a corridor where rooms come together before splitting toward exits.</span><i>e.g. BRIDGE, CORR-WEST</i></div>
+  <div class="node e"><span class="tag" style="background:var(--exit)">EXIT</span><b>Only receives people.</b><span>A stair or exit door, with a capacity it must not exceed.</span><i>e.g. STAIR 1, STAIR 2</i></div>
+  <p class="m">You never label the type. The tool works it out from which way the arrows point.</p>
+ </div>
+</div></div>`});
+
+/* 2. flow */
+CARDS.push({title:'Following the occupants',html:`<div class="ci">${head(2,'Following the occupants: room &rarr; corridor &rarr; stair','Plan check expects occupants to leave their rooms, pool together in the corridor, then split among the exits. EgressTools does that math.')}
+<svg width="1178" height="410" viewBox="0 0 1178 410" aria-label="MOC 116 and PANTRY 32 pool into BRIDGE 148, split 74 and 74 to two stairs">
+ ${['ROOMS','ROOM DOORS','CORRIDOR POOL','STAIR DOORS','EXITS'].map((s,i)=>tx([90,330,600,860,1060][i],14,s,{a:'middle',s:13,b:1,c:C.muted})).join('')}
+ ${chip(90,150,160,66,'MOC','load 116',C.room)}${chip(90,330,160,66,'PANTRY','load 32',C.room)}
+ ${[[39,80],[39,150],[38,220]].map(([n,y])=>ln(170,150,290,y)+mk(320,y,n,{dir:'right',r:24})+arr(380,y,522,190+(y-150)*0.35)).join('')}
+ ${ln(170,330,290,330)}${mk(320,330,32,{dir:'right',r:24})}${arr(380,330,527,245)}
+ <circle cx="600" cy="210" r="82" fill="${C.pool}"/>${tx(600,188,'BRIDGE',{a:'middle',s:20,b:1,c:'#fff'})}${tx(600,228,'148',{a:'middle',s:38,b:1,c:'#fff'})}${tx(600,256,'116 + 32',{a:'middle',s:15,c:'#fff'})}
+ ${arr(680,180,814,134)}${arr(680,240,814,286)}
+ ${mk(850,130,74,{dir:'right',r:26})}${mk(850,290,74,{dir:'right',r:26})}
+ ${arr(918,130,976,130)}${arr(918,290,976,290)}
+ ${chip(1060,130,160,66,'STAIR 1','74 of 220',C.exit)}${chip(1060,290,160,66,'STAIR 2','74 of 220',C.exit)}
+ ${check(1162,130)}${check(1162,290)}
+ ${tx(330,392,'116 &divide; 3 doors = 39 + 39 + 38',{a:'middle',s:14,c:C.muted})}
+ ${tx(600,322,'Everything arriving is added up',{a:'middle',s:14,c:C.muted})}
+ ${tx(860,352,'148 &divide; 2 stairs = 74 + 74',{a:'middle',s:14,c:C.muted})}
+ ${tx(1060,352,'Each stair under its capacity',{a:'middle',s:14,c:C.muted})}
+</svg>
+<div class="panel" style="display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:6px">
+ <div style="display:flex;gap:12px"><span class="num">1</span><div><b style="font-size:18px">What goes in must come out</b><p class="t" style="margin-top:4px">At every room and corridor:<br>own load + people arriving = people leaving</p></div></div>
+ <div style="display:flex;gap:12px"><span class="num">2</span><div><b style="font-size:18px">Exits can't overflow</b><p class="t" style="margin-top:4px">People arriving at a stair must be less than or equal to its capacity.</p></div></div>
+ <div style="display:flex;gap:12px"><span class="num">3</span><div><b style="font-size:18px">Each view stands alone</b><p class="t" style="margin-top:4px">Only markers in the open view are counted, so every floor or sketch is checked separately.</p></div></div>
+</div></div>`});
+
+/* 3. anatomy */
+const PD={
+ dir:{name:'Top / Bottom / Left / Right',q:'Which way does the arrow point?',who:['YOU','#485466'],
+  enter:'Tick <b>one</b> box for the side of the bubble the chevron sits on, i.e. the direction people travel through the door.',
+  ex:'Left ticked = chevron on the left side of the bubble.',
+  when:'Set it when you place the marker, as you always have.',
+  note:'EgressTools never reads or changes these. They only control the graphic.'},
+ EG_Balance:{name:'EG_Balance',q:'Should the tool calculate this number for me?',who:['BUILD TOOLS, OR YOU','#7846BE'],
+  enter:'<b>Ticked</b> = Automatic: the tool works out Occupants for you.<br><b>Unticked</b> = Manual: you type Occupants and the tool never changes it.',
+  ex:'Ticked here, so this marker\u2019s 148 was calculated.',
+  when:'Room Split and Create Pool tick it for you. Typing into Occupants (with Auto Rebalance on) unticks it for you.',
+  note:'Tick it again to hand a marker back to the tool.'},
+ EG_Capacity:{name:'EG_Capacity',q:'How many people can the stair or exit take?',who:['CONNECT TO EXIT, OR YOU','#485466'],
+  enter:'A <b>whole number</b>: the maximum occupants that exit can serve, from your egress width calculation.',
+  ex:'220 = STAIR 2 can take 220 people.',
+  when:'<b>Fill in</b> on markers that go <b>into</b> a stair or exit.<br><b>Leave blank (0)</b> on markers going into a room or corridor.',
+  note:'Every marker going into the same exit must have the same capacity. Connect To Exit sets them all at once.'},
+ EG_From:{name:'EG_From',q:'Where do these people come from?',who:['BUILD TOOLS, OR YOU','#485466'],
+  enter:'The <b>name</b> of the room or corridor this door leads out of. Any short name works.',
+  ex:'BRIDGE = these people come out of the BRIDGE corridor.',
+  when:'<b>Fill in on every marker.</b> Room Split and Create Pool write it for you.',
+  note:'All markers with the same From share that room\u2019s or corridor\u2019s people between them. Spell names the same everywhere: STAIR 2 and STAIR-2 are different.'},
+ EG_Load:{name:'EG_Load',q:'How many people are in this room?',who:['ROOM SPLIT, OR YOU','#485466'],
+  enter:'A <b>whole number</b>: the room\u2019s total occupant load from your occupancy calculation (area \u00f7 load factor).',
+  ex:'MOC\u2019s door markers would have 116. This marker has <b>0</b> because it leaves BRIDGE, a corridor.',
+  when:'<b>Fill in</b> on markers leaving a <b>room</b>; entering it on one door is enough.<br><b>Leave 0</b> on markers leaving a <b>corridor</b>. A corridor\u2019s total is added up from the rooms feeding it.',
+  note:'If two doors of the same room show different loads, Health Check flags LOAD CONFLICT.'},
+ EG_Status:{name:'EG_Status',q:'Is anything wrong with this marker?',who:['TOOL ONLY','#006EDC'],
+  enter:'<b>Nothing. Don\u2019t edit it.</b> The tool writes OK, or a short problem like OVER CAP 14 or NO LOAD.',
+  ex:'OK = balanced and within capacity.',
+  when:'Updated every time the tool recalculates.',
+  note:'See the Checking your work card for what each status means.'},
+ EG_To:{name:'EG_To',q:'Where are these people going?',who:['BUILD TOOLS, OR YOU','#485466'],
+  enter:'The <b>name</b> of the corridor, stair or exit this door leads into.',
+  ex:'STAIR 2 = these people go into STAIR 2.',
+  when:'<b>Fill in on every marker.</b> Create Pool and Connect To Exit write it for you.',
+  note:'A name that only ever appears as a To (never as a From) is treated as an exit.'},
+ Occupants:{name:'Occupants',q:'How many people go through this door?',who:['TOOL OR YOU','#7846BE'],
+  enter:'A <b>whole number</b>: the number shown in the bubble.',
+  ex:'148. Revit shows 148.000000 because it\u2019s a Number parameter; the bubble shows 148.',
+  when:'<b>Automatic marker:</b> leave it; the tool fills it in.<br><b>Manual marker:</b> type the number you want. With Auto Rebalance on, the marker switches to Manual for you.',
+  note:'Start new markers at 0 and let the Build tools fill them in.'},
+};
+const ROWS=[['Top','',0,'dir'],['Bottom','',0,'dir'],['Left','',1,'dir'],['Right','',0,'dir'],['EG_Balance','',1,'EG_Balance'],'Text',
+ ['EG_Capacity','220',null,'EG_Capacity'],['EG_From','BRIDGE',null,'EG_From'],['EG_Load','0',null,'EG_Load'],['EG_Status','OK',null,'EG_Status'],['EG_To','STAIR 2',null,'EG_To'],['Occupants','148.000000',null,'Occupants']];
+function pdHTML(k){const p=PD[k];return `<div class="pdh"><div><div class="pdn">${p.name}</div><div class="pdq">${p.q}</div></div><span class="tag" style="background:${p.who[1]}">${p.who[0]}</span></div>
+ <div class="pds"><div class="pdl">WHAT TO ENTER</div><div>${p.enter}</div></div>
+ <div class="pds"><div class="pdl">IN THIS EXAMPLE</div><div>${p.ex}</div></div>
+ <div class="pds"><div class="pdl">WHEN TO FILL IT IN</div><div>${p.when}</div></div>
+ <div class="pdnote">${p.note}</div>`;}
+CARDS.push({title:'Anatomy of a marker',html:`<div class="ci">${head(3,'Anatomy of a marker: the Properties palette','EgressTools adds the parameters that start with EG_. Hover over, tap or tab to a row in the palette to see what goes in it.')}
+<div class="anat">
+ <div>
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px">
+   <svg width="54" height="66" viewBox="-30 -54 60 74" aria-hidden="true">${mk(0,0,148,{dir:'up',r:20})}</svg>
+   <b style="font-size:15.5px;line-height:1.35">This marker: 148 people go from BRIDGE to STAIR 2, which can hold 220.</b>
+  </div>
+  <div class="pal" id="pal" role="listbox" aria-label="Marker parameters">
+   <div class="ph">Properties</div>
+   <div class="pt"><div>Symbol - Occupant Load_Editable</div><div>Circular</div></div>
+   <div class="grp">Graphics</div>
+   ${ROWS.map(r=>typeof r==='string'?`<div class="grp">${r}</div>`:
+     `<div class="row" tabindex="0" role="option" data-k="${r[3]}"><div>${r[0]}<span class="hov">&rsaquo;</span></div><div>${r[2]===null?r[1]:`<span class="cb${r[2]?' on':''}"></span>`}</div></div>`).join('')}
+  </div>
+ </div>
+ <div class="pd" id="pd" aria-live="polite"></div>
+</div></div>`,init(card){
+  const rows=[...card.querySelectorAll('.row')],pd=card.querySelector('#pd');let sel='Occupants';
+  const show=k=>{rows.forEach(r=>{r.classList.toggle('hl',r.dataset.k===k);r.setAttribute('aria-selected',r.dataset.k===k);});
+    pd.classList.remove('in');void pd.offsetWidth;pd.innerHTML=pdHTML(k);pd.classList.add('in');};
+  rows.forEach(r=>{
+    r.addEventListener('mouseenter',()=>show(r.dataset.k));
+    r.addEventListener('focus',()=>{sel=r.dataset.k;show(sel);});
+    r.addEventListener('click',()=>{sel=r.dataset.k;show(sel);});
+    r.addEventListener('keydown',e=>{const i=rows.indexOf(r);
+      if(e.key==='ArrowDown'&&rows[i+1]){e.preventDefault();e.stopPropagation();rows[i+1].focus();}
+      if(e.key==='ArrowUp'&&rows[i-1]){e.preventDefault();e.stopPropagation();rows[i-1].focus();}});
+  });
+  card.querySelector('#pal').addEventListener('mouseleave',()=>show(sel));
+  show(sel);
+}});
+
+/* 4. auto vs manual */
+function trio(x,y,nums,modes,st){
+  return chip(x,y+50,116,58,'MOC','load 116',C.room)+nums.map((n,j)=>ln(x+58,y+50,x+150,y+j*50)+mk(x+176,y+j*50,n,{dir:'right',r:19,mode:modes[j],st:st})).join('');
+}
+CARDS.push({title:'Automatic or manual?',html:`<div class="ci">${head(4,'Automatic or manual? How the numbers fill in','Automatic (EG_Balance ticked): the tool calculates the number. Manual (unticked): you type it. The mix at each split decides what happens.')}
+<div class="legend">
+ <div><svg width="58" height="50" viewBox="-24 -22 58 50" aria-hidden="true">${mk(0,6,39,{dir:'right',r:17,mode:'A'})}</svg><span style="color:var(--auto)">Automatic</span></div>
+ <div><svg width="58" height="50" viewBox="-24 -22 58 50" aria-hidden="true">${mk(0,6,45,{dir:'right',r:17,mode:'M'})}</svg>Manual</div>
+ <span class="m" style="font-weight:400">The A / M badges are for this guide only. The real marker shows just the number.</span>
+</div>
+<div class="grid3" style="flex:none">
+ ${[['All automatic','Split evenly',[39,39,38],['A','A','A'],null,'116 &divide; 3 = 38.67, so the extra person goes to the first door: 39 + 39 + 38.'],
+    ['Some manual, some automatic','Automatic markers share what\u2019s left',[50,33,33],['M','A','A'],null,'You set 50. The other two share the remaining 66: 33 + 33.'],
+    ['All manual','Only checked, never changed',[40,40,30],['M','M','M'],'orange','40 + 40 + 30 = 110, which is 6 short of 116. The markers turn orange: UNDER 6.']]
+   .map(([t,s,n,m,st,note],i)=>`<div class="panel" style="padding:12px 18px"><b style="font-size:18px">${t}</b><div style="font-weight:800;font-size:14.5px;color:${i<2?'var(--auto)':'var(--muted)'};margin:2px 0 4px">${s}</div>
+   <svg width="350" height="150" viewBox="0 0 350 150">${trio(64,24,n,m,st)}${st?`<rect x="292" y="54" width="54" height="40" rx="10" fill="${C.orange}"/>${tx(319,71,'UNDER',{a:'middle',s:11,b:1,c:'#fff'})}${tx(319,87,'6',{a:'middle',s:14,b:1,c:'#fff'})}`:check(306,84)}</svg>
+   <p class="t" style="font-size:14px;margin:0">${note}</p></div>`).join('')}
+</div>
+<div class="panel" style="margin-top:12px;flex:1;padding:12px 20px;background:#fff;border:1.5px solid var(--line)">
+ <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px"><b style="font-size:19px">Try it: type a number into the first door (Auto Rebalance ON)</b>${ic('auto',34)}</div>
+ <div class="try">
+  <div><label for="tryIn">First door, MOC (load 116)</label><input id="tryIn" type="number" inputmode="numeric" min="0" max="116" value="45"><div class="msg" id="tryMsg" aria-live="polite"></div></div>
+  <div style="display:flex;gap:26px;align-items:center">
+   <svg width="200" height="160" viewBox="0 0 200 160" id="trySvg" style="flex:none" aria-label="Markers after rebalancing"></svg>
+   <ol class="steps" style="max-width:380px"><li>The marker you typed into becomes Manual (EG_Balance is unticked for you).</li><li id="tryStep">The other doors absorb the difference.</li><li>The total stays 116, so everything downstream stays correct.</li></ol>
+  </div>
+  <div class="tips"><div><b>Undo it</b>Tick EG_Balance again to make the marker automatic.</div><div><b>One-door rooms</b>No other door can absorb a change, so edit the room's EG_Load instead.</div><div><b>Auto Rebalance OFF?</b>Untick EG_Balance first, type the number, then click Rebalance.</div></div>
+ </div>
+</div></div>`,init(card){
+  const inp=card.querySelector('#tryIn'),svg=card.querySelector('#trySvg'),msg=card.querySelector('#tryMsg'),st=card.querySelector('#tryStep');
+  const draw=()=>{let v=parseInt(inp.value,10);msg.textContent='';
+    if(isNaN(v)){v=0;msg.textContent='Enter a whole number from 0 to 116.';}
+    if(v<0){v=0;msg.textContent='Occupants can\u2019t be negative.';}
+    if(v>116){v=116;msg.textContent='Capped at the room load, 116.';}
+    const rem=116-v,a=Math.ceil(rem/2),b=rem-a;
+    svg.innerHTML=[[v,'M'],[a,'A'],[b,'A']].map(([n,m],j)=>mk(30,30+j*50,n,{dir:'right',r:20,mode:m})).join('')+
+      tx(100,88,`= ${v+a+b}`,{s:22,b:1})+check(180,80);
+    st.textContent=`The other doors absorb the difference: 116 \u2212 ${v} = ${rem} \u2192 ${a} + ${b}.`;};
+  inp.addEventListener('input',draw);draw();
+}});
+
+/* 5. workflow */
+const WF=[
+ ['roomsplit','Room Split','ONCE PER ROOM',['Select one room\u2019s door markers','Click Room Split','Name the room (e.g. MOC)','Enter its occupant load'],'Doors split evenly',
+   chip(44,44,80,54,'MOC','116',C.room)+[39,39,38].map((n,j)=>mk(116+j*58,44,n,{dir:'right',r:16,mode:'A'})).join('')],
+ ['pool','Create Pool','ONCE PER CORRIDOR',['Click Create Pool','Name it (e.g. BRIDGE)','Pick IN markers, click Finish','Pick OUT markers, click Finish'],'Corridor split evenly',
+   [39,39,38,32].map((n,j)=>mk(18,8+j*23,n,{dir:'right',r:10})).join('')+arr(50,44,92,44)+`<circle cx="130" cy="44" r="34" fill="${C.pool}"/>`+tx(130,52,'148',{a:'middle',s:20,b:1,c:'#fff'})+arr(166,44,196,44)+mk(222,22,74,{dir:'right',r:15,mode:'A'})+mk(222,66,74,{dir:'right',r:15,mode:'A'})],
+ ['exit','Connect To Exit','ONCE PER STAIR / EXIT',['Select markers going into the stair','Click Connect To Exit','Pick or create the exit','Enter its capacity'],'Capacity is checked',
+   mk(26,44,74,{dir:'right',r:18})+arr(72,44,100,44)+chip(166,44,124,56,'STAIR 2','74 of 220',C.exit)+check(250,44)],
+ ['health','Health Check','WHENEVER YOU WANT',['Click Health Check','Problems are colored and selected','Read the totals report','Fix, then check again'],'Everything verified',
+   [[39,null],[74,null],[33,'orange'],[230,'red']].map(([n,s],j)=>mk(24+j*64,44,n,{dir:'right',r:17,st:s})).join('')],
+];
+CARDS.push({title:'Building an egress plan',html:`<div class="ci">${head(5,'Building an egress plan in 4 steps','Place your markers at the doors as usual and leave them at 0. Then let the Build tools connect and fill them in. You won\u2019t need to type in Properties.')}
+<div class="band">
+ <div class="panel">${ic('setup',56)}<div><b>Once per project: Setup Parameters</b><span>Load a shared parameters file (Manage &gt; Shared Parameters). Then select a marker, click Setup Parameters and answer Yes.</span></div></div>
+ <div class="panel">${ic('auto',56)}<div><b>Then: turn Auto Rebalance ON</b><span>Click it once. Every change now recalculates the view automatically, and the setting is remembered between Revit sessions.</span></div></div>
+</div>
+<div class="wf">${WF.map((w,i)=>`<div class="step"><div class="top"><span class="num" style="width:34px;height:34px;font-size:17px">${i+1}</span>${ic(w[0],52)}</div>
+ <h4>${w[1]}</h4><span class="tag" style="background:#7A828E;align-self:flex-start">${w[2]}</span>
+ <ul>${w[3].map(s=>`<li>${s}</li>`).join('')}</ul>
+ <div class="res"><div class="lb">RESULT: ${w[4].toUpperCase()}</div><svg width="100%" height="76" viewBox="0 0 268 84">${w[5]}</svg></div></div>`).join('')}</div>
+<div class="tipsrow">
+ <div><b>Watch the status bar.</b>When a tool asks you to pick, the instructions appear at the bottom-left of Revit.</div>
+ <div><b>Finish vs. Esc.</b>Click Finish (top-left Options Bar) when done picking. Esc cancels or skips that step.</div>
+ <div><b>Corridor splits again?</b>Make one pool per segment. Pools can feed pools, and branches can recombine.</div>
+</div></div>`});
+
+/* 6. checking */
+const halfPlan=`<g stroke="#C9CDD3" stroke-width="3" fill="none"><path d="M8 18 H300 M8 136 H300 M120 18 V60 M120 96 V136 M200 18 V54 M200 100 V136"/><rect x="232" y="58" width="44" height="40"/></g>`;
+CARDS.push({title:'Checking your work',html:`<div class="ci">${head(6,'Checking your work','Health Check finds problems, Show Relationships shows the flow on the plan, and Inspector explains one marker. Hide the overlay and clear highlights before you print.')}
+<div class="chk">
+ <div class="panel"><div class="ph2">${ic('health',52)}<div><b>Health Check</b><span>One click: recalculates, colors problem markers, selects them and opens a totals report.</span></div></div>
+  ${[['red',230,'Red: over capacity','A stair gets more people than it can hold. Move people to another exit.'],
+     ['orange',33,'Orange: doesn\u2019t add up','Markers leaving a node total too many or too few. Adjust a number.'],
+     ['yellow',0,'Yellow: missing info','No room load or capacity, or conflicting values for one room or exit.'],
+     ['purple',12,'Purple: broken path','Blank From/To, or a path that loops back. Reconnect with a Build tool.']]
+    .map(([s,n,t,d])=>`<div class="sev"><svg width="60" height="50" viewBox="-26 -20 60 50" style="grid-row:span 2" aria-hidden="true">${mk(0,8,n,{dir:'right',r:15,st:s})}</svg><b style="color:${C[s]}">${t}</b><span>${d}</span></div>`).join('')}
+ </div>
+ <div class="panel"><div class="ph2">${ic('relationships',52)}<div><b>Show Relationships</b><span>Draws the flow like a hand markup: thick curved arrows and bold boxed labels over a halftoned plan.</span></div></div>
+  <div class="rel">
+   <svg width="100%" height="150" viewBox="0 0 310 150" aria-label="Red arrows from three doors into a boxed corridor label, dashed blue arrows from the label to two stair markers">
+    ${halfPlan}
+    ${arc(36,34,142,70,-14,TIER[0],0)}${arc(36,78,140,78,8,TIER[0],0)}${arc(36,122,142,88,16,TIER[0],0)}
+    ${arc(212,70,268,34,-12,TIER[1],1)}${arc(212,90,268,122,12,TIER[1],1)}
+    ${mk(24,34,39,{dir:'right',r:11})}${mk(24,78,39,{dir:'right',r:11})}${mk(24,122,38,{dir:'right',r:11})}
+    <rect x="142" y="64" width="72" height="32" fill="#fff" stroke="#111" stroke-width="1.5"/>
+    ${tx(178,78,'CORR',{a:'middle',s:11,b:1})}${tx(178,91,'116 &rarr; 58/58',{a:'middle',s:9.5,b:1})}
+    ${mk(286,34,58,{dir:'right',r:11})}${mk(286,122,58,{dir:'right',r:11})}
+   </svg>
+   <div class="tiers">
+    <div><svg width="40" height="10"><line x1="2" y1="5" x2="38" y2="5" stroke="${TIER[0]}" stroke-width="4.5"/></svg>1st move: room &rarr; corridor</div>
+    <div><svg width="40" height="10"><line x1="2" y1="5" x2="38" y2="5" stroke="${TIER[1]}" stroke-width="4.5" stroke-dasharray="9 6"/></svg>2nd move: dashed</div>
+    <div><svg width="40" height="10"><line x1="2" y1="5" x2="38" y2="5" stroke="${TIER[2]}" stroke-width="4.5"/></svg>3rd move</div>
+    <div><svg width="40" height="10"><line x1="2" y1="5" x2="38" y2="5" stroke="${TIER[3]}" stroke-width="4.5" stroke-dasharray="9 6"/></svg>4th move: dashed</div>
+    <span style="font-weight:400;color:var(--muted);font-size:12.5px;line-height:1.3">Every second move is dashed. Small arrowheads repeat along each arrow.</span>
+   </div>
+  </div>
+  <ul style="margin:6px 0 0;padding-left:18px;font-size:13.5px;line-height:1.38">
+   <li><b>Nothing selected:</b> shows the whole view. Click again to hide it and restore the view.</li>
+   <li><b>Markers selected:</b> shows only their branch. <b>Drag labels</b> anywhere; they stay put.</li></ul>
+ </div>
+ <div class="panel"><div class="ph2">${ic('inspector',52)}<div><b>Inspector</b><span>Select one marker to see where its people came from and where they go.</span></div></div>
+  <div class="insp"><b>Marker 74 &rarr; STAIR 2</b> <span style="color:var(--muted)">(Automatic, OK)</span>
+   <div style="font-size:12.5px;font-weight:800;color:var(--muted);margin-top:6px">OCCUPANTS BY ROOM OF ORIGIN</div>
+   <div class="bar"><b>MOC</b><i style="width:78%" data-v="58"></i></div>
+   <div class="bar"><b>PANTRY</b><i style="width:22%" data-v="16"></i></div>
+   <div style="font-size:12px;color:var(--muted)">Example only. Real breakdowns are proportional and may show decimals.</div></div>
+ </div>
+ <div class="panel print"><div class="ph2">${ic('clear',52)}<div><b style="color:var(--red)">Before you print or issue</b><span style="color:var(--ink)">The overlay, its halftone and Health Check colors are real view changes. They plot and sync to central.</span></div></div>
+  <label><input type="checkbox">${ic('relationships',30)}<span>Click <b>Show Relationships</b> (nothing selected) to hide the overlay. This also removes the halftone and reapplies the view template.</span></label>
+  <label><input type="checkbox">${ic('clear',30)}<span>Click <b>Clear Highlights</b> to remove Health Check colors.</span></label>
+  <label><input type="checkbox">${ic('health',30)}<span>Run a final <b>Health Check</b> (all OK), then Clear Highlights again.</span></label>
+ </div>
+</div></div>`});
+
+/* 7. reference */
+const REF=[
+ [['SETUP','Do once',[['setup','Setup Parameters','Adds the EG_ parameters to the marker family.','Once per project']]],
+  ['BUILD','Connect the markers',[['roomsplit','Room Split','Names a room, sets its load, splits it across its doors.','Once per room'],['pool','Create Pool','Pools markers into a corridor and splits the total.','Once per corridor'],['exit','Connect To Exit','Links markers to a stair and sets its capacity.','Once per exit']]]],
+ [['BALANCE','Keep numbers right',[['rebalance','Rebalance','Recalculates the view now and shows the report.','After deleting markers'],['auto','Auto Rebalance','On/off switch: recalculate on every edit.','Leave it on']]],
+  ['ADVANCED','Power users',[['setpath','Set Path','Type From / To directly for selected markers.','Quick redirects']]]],
+ [['CHECK','Verify and explain',[['health','Health Check','Colors and selects problems, shows totals.','Any time'],['clear','Clear Highlights','Removes Health Check colors.','Before printing'],['relationships','Show Relationships','Shows or hides the color-coded flow overlay.','To see the flow'],['settings','Overlay Settings','Room labels, halftone, line weight, arrow spacing.','To change the look'],['inspector','Inspector','Explains one marker by room of origin.','When a number is odd']]]],
+];
+CARDS.push({title:'Button quick reference',html:`<div class="ci">${head(7,'Button quick reference','The EgressTools tab has five panels, used roughly left to right. Hover over any button in Revit for a short reminder.')}
+<div class="ref">${REF.map(col=>`<div style="display:flex;flex-direction:column;gap:12px">${col.map(([n,s,bs])=>`<div class="grp2"><div class="gh"><span class="tag" style="background:var(--red);font-size:12px">${n}</span><b style="color:var(--muted);font-size:14px">${s}</b></div>
+ ${bs.map(b=>`<div class="btnc">${ic(b[0],44,b[1]+' icon')}<b>${b[1]}</b><span>${b[2]}</span><span class="tag">${b[3].toUpperCase()}</span></div>`).join('')}</div>`).join('')}</div>`).join('')}</div></div>`});
+
+/* ---------- engine ---------- */
+const N=CARDS.length, vp=document.getElementById('viewport'), track=document.getElementById('track'), dotsEl=document.getElementById('dots');
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+CARDS.forEach((c,i)=>{
+  const s=document.createElement('div');s.className='snap';track.appendChild(s);
+  const el=document.createElement('section');el.className='card next';el.setAttribute('aria-label',c.title);el.innerHTML=c.html;vp.appendChild(el);c.el=el;
+  if(c.init)c.init(el);
+  const d=document.createElement('button');d.type='button';d.className='dot';d.setAttribute('aria-label','Go to card '+(i+1)+': '+c.title);d.addEventListener('click',()=>goTo(i));dotsEl.appendChild(d);
+});
+const toc=document.getElementById('toc');
+CARDS.slice(1).forEach((c,i)=>{const b=document.createElement('button');b.type='button';b.className='jump';b.innerHTML=`<span>${i+1}</span>${c.title}`;b.addEventListener('click',()=>goTo(i+1));toc.appendChild(b);});
+
+let cur=-1, scale=1;
+function fit(){
+  const w=vp.clientWidth-32,h=vp.clientHeight-28;
+  scale=Math.max(0.2,Math.min(w/1280,h/760,1.25));
+  paint();
+}
+function paint(){
+  CARDS.forEach((c,i)=>{
+    const d=i-cur, el=c.el, base=`translate(-50%,-50%) scale(${scale})`;
+    el.classList.toggle('cur',d===0);el.classList.toggle('past',d<0);el.classList.toggle('next',d>0);
+    el.setAttribute('aria-hidden',d!==0);el.inert=d!==0;
+    if(reduce){el.style.transform=base;return;}
+    if(d===0) el.style.transform=base;
+    else if(d<0) el.style.transform=`${base} translateY(-46%) rotateX(68deg) scale(.9)`;
+    else el.style.transform=`${base} translateY(34%) rotateX(-18deg) scale(.94)`;
+    el.style.zIndex=d===0?3:(d<0?2:1);
+  });
+}
+function setCur(i){
+  i=Math.max(0,Math.min(N-1,i)); if(i===cur)return; cur=i; paint();
+  [...dotsEl.children].forEach((d,k)=>{d.classList.toggle('on',k===cur);d.setAttribute('aria-current',k===cur?'step':'false');});
+  document.getElementById('backBtn').disabled=cur===0;
+  document.getElementById('nextBtn').innerHTML=cur===N-1?'Back to start &#8635;':'Next &rsaquo;';
+  document.getElementById('progress').style.width=((cur+1)/N*100)+'%';
+  document.getElementById('cardTitle').textContent=(cur?cur+' / '+(N-1)+'  \u2022  ':'')+CARDS[cur].title;
+}
+function goTo(i){i=Math.max(0,Math.min(N-1,i));window.scrollTo({top:i*window.innerHeight,behavior:reduce?'auto':'smooth'});setCur(i);}
+function onScroll(){setCur(Math.round(window.scrollY/window.innerHeight));}
+window.addEventListener('scroll',onScroll,{passive:true});
+window.addEventListener('resize',()=>{fit();window.scrollTo({top:cur*window.innerHeight});});
+document.getElementById('backBtn').addEventListener('click',()=>goTo(cur-1));
+document.getElementById('nextBtn').addEventListener('click',()=>goTo(cur===N-1?0:cur+1));
+window.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('input,textarea'))return;
+  const k=e.key;
+  if(k==='ArrowDown'||k==='ArrowRight'||k==='PageDown'||(k===' '&&!e.shiftKey)){e.preventDefault();goTo(cur+1);}
+  else if(k==='ArrowUp'||k==='ArrowLeft'||k==='PageUp'||(k===' '&&e.shiftKey)){e.preventDefault();goTo(cur-1);}
+  else if(k==='Home'){e.preventDefault();goTo(0);} else if(k==='End'){e.preventDefault();goTo(N-1);}
+});
+fit(); setCur(Math.round(window.scrollY/window.innerHeight)||0);
+</script>
+</body>
+</html>
